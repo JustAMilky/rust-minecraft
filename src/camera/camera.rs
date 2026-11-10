@@ -17,9 +17,9 @@ pub struct Camera {
 impl Camera {
     pub fn direction(&self) -> Vec3 {
         Vec3::new(
-            self.yaw.cos() * self.pitch.cos(),
-            self.pitch.sin(),
             self.yaw.sin() * self.pitch.cos(),
+            self.pitch.sin(),
+            self.yaw.cos() * self.pitch.cos(),
         ).normalize()
     }
 }

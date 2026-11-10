@@ -12,6 +12,7 @@ mod block;
 mod utils;
 mod texture;
 mod camera;
+mod chunk;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();

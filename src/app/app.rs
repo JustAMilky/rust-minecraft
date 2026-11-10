@@ -2,11 +2,13 @@ use winit::{
     application::ApplicationHandler, event::*, event_loop::ActiveEventLoop, keyboard::PhysicalKey, window::Window
 };
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
 use crate::gamestate::gamestate::GameState;
 use crate::renderer::renderer::Renderer;
 use crate::gui::gui::Gui;
 use crate::texture::texture::{Texture, TextureAtlas};
+use crate::app::input::InputManager;
 
 pub struct App {
     window: Option<Arc<Window>>,
@@ -16,6 +18,10 @@ pub struct App {
 
     fps: f32,
     last_frame: std::time::Instant,
+    last_tick: std::time::Instant,
+    tick_interval: Duration,
+
+    input_man: InputManager,
 
     texture_atlas: TextureAtlas,
 }
@@ -29,6 +35,9 @@ impl App {
             gui: None,
             fps: 0.0,
             last_frame: Instant::now(),
+            last_tick: Instant::now(),
+            tick_interval: Duration::from_millis(50),
+            input_man: InputManager::new(),
             texture_atlas,
         }
     }
@@ -45,17 +54,20 @@ impl ApplicationHandler<()> for App {
             event_loop.create_window(window_attributes).unwrap()
         );
 
+        let state = pollster::block_on(
+            GameState::new()
+        ).unwrap();
+
+        self.state = Some(state);
+
         let renderer = pollster::block_on(
             Renderer::new(window.clone(), Texture {
                 width: self.texture_atlas.width,
                 height: self.texture_atlas.height,
                 pixels: self.texture_atlas.pixels.clone(),
-            })
+            }
+        )
         ).expect("Failed to create renderer");
-
-        let state = pollster::block_on(
-            GameState::new()
-        ).unwrap();
 
         let gui = Gui::new(
             &window,
@@ -63,13 +75,23 @@ impl ApplicationHandler<()> for App {
             renderer.config.clone(),
         ).expect("Failed to create GUI");
 
-        self.window = Some(window);
         self.renderer = Some(renderer);
-        self.state = Some(state);
         self.gui = Some(gui);
+        self.window = Some(window);
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        let now = Instant::now();
+
+        if now.duration_since(self.last_tick) >= self.tick_interval {
+            self.last_tick = now;
+
+            self.state
+                .as_mut()
+                .expect("Unable to update game state")
+                .game_tick();
+        }
+
         if let Some(window) = &self.window {
             window.request_redraw();
         }
@@ -100,6 +122,8 @@ impl ApplicationHandler<()> for App {
             window.request_redraw();
         }
 
+        self.input_man.process_event(&event);
+
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => renderer.resize(size.width, size.height),
@@ -115,9 +139,9 @@ impl ApplicationHandler<()> for App {
                 self.state
                     .as_mut()
                     .expect("Unable to update game state: No game state")
-                    .update();
+                    .frame_tick(&self.input_man);
 
-                match renderer.render(window, gui) {
+                match renderer.render(window, gui, &self.state.as_ref().expect("Cannot create renderer: no GameState").camera) {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("{e}");

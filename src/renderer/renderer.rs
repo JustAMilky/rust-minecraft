@@ -18,8 +18,8 @@ const VERTICES: &[Vertex] = &[
 ];
 
 const INDICES: &[u16] = &[
-    0, 1, 2,
-    0, 2, 3,
+    0, 2, 1,
+    0, 3, 2,
 ];
 
 pub struct Renderer {
@@ -39,7 +39,6 @@ pub struct Renderer {
     pub texture: wgpu::Texture,
     texture_bind_group: wgpu::BindGroup,
 
-    pub camera: Camera,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup, 
 }
@@ -308,13 +307,6 @@ impl Renderer {
                 num_indices,
                 texture: render_texture,
                 texture_bind_group,
-                camera: Camera {
-                    position: Vec3::new(0.0, 0.0, 5.0),
-                    yaw: -90.0_f32.to_radians(),
-                    pitch: 0.0,
-                    fov: 60.0_f32.to_radians(),
-                    aspect_ratio: 16.0 / 9.0,
-                },
                 camera_buffer,
                 camera_bind_group,
             }
@@ -334,20 +326,21 @@ impl Renderer {
         &mut self,
         window: &Window,
         gui: &mut Gui,
+        camera: &Camera,
     ) -> anyhow::Result<()> {
         if !self.is_surface_configured {
             return Ok(());
         }
 
         let view = look_to_mat4(
-            self.camera.position,
-            self.camera.direction(),
+            camera.position,
+            camera.direction(),
             Vec3::Y,
         );
 
         let projection = perspective(
-            self.camera.fov,
-            self.camera.aspect_ratio,
+            camera.fov,
+            camera.aspect_ratio,
             0.1,
             1000.0,
         );
