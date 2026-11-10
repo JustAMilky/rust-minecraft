@@ -1,6 +1,8 @@
 use std::{collections::HashMap, vec};
 
-use crate::{model::model::*, utils::direction::Direction};
+use crate::model::model::*;
+use crate::utils::direction::Direction;
+use crate::texture::texture::TextureId;
 
 pub fn populate_model_registry(model_registry: &mut ModelRegistry) {
     model_registry.models = HashMap::from([
@@ -33,7 +35,7 @@ fn stone_model() -> BlockModel {
             },
         ],
         textures: HashMap::from([
-            ("all".to_string(), "stone".to_string()),
+            ("all".to_string(), TextureId::Stone),
         ])
     }
 }
@@ -41,7 +43,7 @@ fn stone_model() -> BlockModel {
 fn _dirt_model() -> BlockModel {
     let mut model = stone_model();
     model.textures = HashMap::from([
-        ("all".to_string(), "dirt".to_string()),
+        ("all".to_string(), TextureId::Dirt),
     ]);
     model
 }

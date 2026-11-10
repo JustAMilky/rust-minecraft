@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::utils::direction::Direction;
+use crate::texture::texture::TextureId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ModelId {
@@ -14,7 +15,7 @@ pub struct ModelRegistry {
 
 pub struct BlockModel {
     pub elements: Vec<ModelElement>,
-    pub textures: HashMap<String, String>,
+    pub textures: HashMap<String, TextureId>,
 }
 
 pub struct ModelElement {

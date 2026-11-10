@@ -6,6 +6,7 @@ use std::time::Instant;
 use crate::gamestate::gamestate::GameState;
 use crate::renderer::renderer::Renderer;
 use crate::gui::gui::Gui;
+use crate::texture::texture::{Texture, TextureAtlas};
 
 pub struct App {
     window: Option<Arc<Window>>,
@@ -15,10 +16,12 @@ pub struct App {
 
     fps: f32,
     last_frame: std::time::Instant,
+
+    texture_atlas: TextureAtlas,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(texture_atlas: TextureAtlas) -> Self {
         Self {
             window: None,
             state: None,
@@ -26,6 +29,7 @@ impl App {
             gui: None,
             fps: 0.0,
             last_frame: Instant::now(),
+            texture_atlas,
         }
     }
 }
@@ -42,7 +46,11 @@ impl ApplicationHandler<()> for App {
         );
 
         let renderer = pollster::block_on(
-            Renderer::new(window.clone())
+            Renderer::new(window.clone(), Texture {
+                width: self.texture_atlas.width,
+                height: self.texture_atlas.height,
+                pixels: self.texture_atlas.pixels.clone(),
+            })
         ).expect("Failed to create renderer");
 
         let state = pollster::block_on(
@@ -109,7 +117,7 @@ impl ApplicationHandler<()> for App {
                     .expect("Unable to update game state: No game state")
                     .update();
 
-                match renderer.render(window, gui, 0.0) {
+                match renderer.render(window, gui) {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("{e}");

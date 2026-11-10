@@ -3,6 +3,7 @@
 pub struct Vertex {
     pub position: [f32; 3],
     pub colour: [f32; 3],
+    pub uv: [f32; 2],
 }
 
 impl Vertex {
@@ -21,7 +22,12 @@ impl Vertex {
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x3,
                 },
-            ]
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 6]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+            ],
         }
     }
 }
