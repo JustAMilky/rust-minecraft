@@ -11,6 +11,7 @@ mod model;
 mod block;
 mod utils;
 mod texture;
+mod camera;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();

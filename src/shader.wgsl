@@ -4,6 +4,13 @@ var block_texture: texture_2d<f32>;
 @group(0) @binding(1)
 var block_sampler: sampler;
 
+struct CameraUniform {
+    view_projection: mat4x4<f32>,
+};
+
+@group(1) @binding(0)
+var<uniform> camera: CameraUniform;
+
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) colour: vec3<f32>,
@@ -22,7 +29,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 
     out.colour = model.colour;
     out.uv = model.uv;
-    out.clip_position = vec4<f32>(model.position, 1.0);
+    out.clip_position = camera.view_projection * vec4<f32>(model.position, 1.0);
 
     return out;
 }

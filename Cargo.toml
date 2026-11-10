@@ -18,6 +18,7 @@ egui-wgpu = "0.37"
 egui-winit = "0.37"
 bytemuck = { version = "1.25.2", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
+glam = "0.34.3"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"

@@ -1,11 +1,14 @@
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
-
+use glam::Vec3;
+use glam::camera::rh::view::look_to_mat4;
+use glam::camera::rh::proj::directx::perspective;
 use winit::window::Window;
 
 use crate::renderer::vertex::Vertex;
 use crate::gui::gui::Gui;
 use crate::texture::texture::Texture;
+use crate::camera::camera::*;
 
 const VERTICES: &[Vertex] = &[
     Vertex { position: [-0.5,  0.5,  0.0], colour: [1.0, 1.0, 1.0], uv: [0.0, 0.0] },
@@ -18,17 +21,6 @@ const INDICES: &[u16] = &[
     0, 1, 2,
     0, 2, 3,
 ];
-
-fn vertices_for_aspect(aspect: f32) -> Vec<Vertex> {
-    VERTICES
-        .iter()
-        .copied()
-        .map(|mut vertex| {
-            vertex.position[0] /= aspect;
-            vertex
-        })
-        .collect()
-}
 
 pub struct Renderer {
     pub surface: wgpu::Surface<'static>,
@@ -45,7 +37,11 @@ pub struct Renderer {
     pub num_indices: u32,
 
     pub texture: wgpu::Texture,
-    pub texture_bind_group: wgpu::BindGroup,
+    texture_bind_group: wgpu::BindGroup,
+
+    pub camera: Camera,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup, 
 }
 
 impl Renderer {
@@ -174,6 +170,37 @@ impl Renderer {
                     },
                 ],
             });
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Camera Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Camera Uniform Buffer"),
+            size: std::mem::size_of::<CameraUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Camera Bind Group"),
+            layout: &camera_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
         
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps.formats.iter()
@@ -200,7 +227,10 @@ impl Renderer {
         let render_pipeline_layout = device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[Some(&texture_bind_group_layout)],
+                bind_group_layouts: &[
+                    Some(&texture_bind_group_layout),
+                    Some(&camera_bind_group_layout),
+                ],
                 immediate_size: 0,
             },
         );
@@ -245,12 +275,11 @@ impl Renderer {
             cache: None,
         });
 
-        let vertices = vertices_for_aspect(size.width as f32 / size.height as f32);
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                contents: bytemuck::cast_slice(VERTICES),
+                usage: wgpu::BufferUsages::VERTEX,
             }
         );
         let index_buffer = device.create_buffer_init(
@@ -279,18 +308,21 @@ impl Renderer {
                 num_indices,
                 texture: render_texture,
                 texture_bind_group,
+                camera: Camera {
+                    position: Vec3::new(0.0, 0.0, 5.0),
+                    yaw: -90.0_f32.to_radians(),
+                    pitch: 0.0,
+                    fov: 60.0_f32.to_radians(),
+                    aspect_ratio: 16.0 / 9.0,
+                },
+                camera_buffer,
+                camera_bind_group,
             }
         )
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
-            let vertices = vertices_for_aspect(width as f32 / height as f32);
-            self.queue.write_buffer(
-                &self.vertex_buffer,
-                0,
-                bytemuck::cast_slice(&vertices),
-            );
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
@@ -306,6 +338,31 @@ impl Renderer {
         if !self.is_surface_configured {
             return Ok(());
         }
+
+        let view = look_to_mat4(
+            self.camera.position,
+            self.camera.direction(),
+            Vec3::Y,
+        );
+
+        let projection = perspective(
+            self.camera.fov,
+            self.camera.aspect_ratio,
+            0.1,
+            1000.0,
+        );
+
+        let view_projection = projection * view;
+
+        let camera_uniform = CameraUniform {
+            view_projection: view_projection.to_cols_array_2d(),
+        };
+
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::bytes_of(&camera_uniform),
+        );
 
         let output = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(texture)
@@ -361,20 +418,17 @@ impl Renderer {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-
             render_pass.set_bind_group(
                 0,
                 &self.texture_bind_group,
                 &[],
             );
-
+            render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-
             render_pass.set_index_buffer(
                 self.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint16,
             );
-
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
 

@@ -1,9 +1,12 @@
 use winit::{
     event_loop::ActiveEventLoop, keyboard::KeyCode
 };
+use glam::Vec3;
+
+use crate::camera::camera::Camera;
 
 pub struct GameState {
-
+    
 }
 
 impl GameState {
@@ -14,7 +17,7 @@ impl GameState {
     }
 
     pub fn update(&mut self) {
-        // todo!();
+        
     }
 
     pub fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
