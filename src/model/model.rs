@@ -124,10 +124,10 @@ impl ModelElement {
                 Direction::South => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.from[0], self.to[1],   self.to[2]], colour: WHITE, uv: uv[0] },
-                            Vertex { position: [self.to[0],   self.to[1],   self.to[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.to[0],   self.from[1], self.to[2]], colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.from[0], self.from[1], self.to[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [self.from[0], self.to[1],   self.to[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [self.to[0],   self.to[1],   self.to[2]], colour: WHITE, uv: uv[2] },
+                            Vertex { position: [self.to[0],   self.from[1], self.to[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [self.from[0], self.from[1], self.to[2]], colour: WHITE, uv: uv[0] },
                         ],
                         indicies: vec![0, 1, 2, 0, 2, 3],
                     }
@@ -136,10 +136,10 @@ impl ModelElement {
                 Direction::North => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.from[0], self.to[1],   self.from[2]], colour: WHITE, uv: uv[0] },
-                            Vertex { position: [self.to[0],   self.to[1],   self.from[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.to[0],   self.from[1], self.from[2]], colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.from[0], self.from[1], self.from[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [self.from[0], self.to[1],   self.from[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [self.to[0],   self.to[1],   self.from[2]], colour: WHITE, uv: uv[2] },
+                            Vertex { position: [self.to[0],   self.from[1], self.from[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [self.from[0], self.from[1], self.from[2]], colour: WHITE, uv: uv[0] },
                         ],
                         indicies: vec![0, 2, 1, 0, 3, 2],
                     }

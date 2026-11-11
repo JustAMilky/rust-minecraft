@@ -1,6 +1,9 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
+use std::time::Duration;
 use std::{f32::consts::PI, time::Instant};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+use egui::MouseWheelSource::Unknown;
 use winit::{
     event_loop::ActiveEventLoop, keyboard::KeyCode
 };
@@ -12,12 +15,25 @@ use crate::app::input::InputManager;
 use crate::chunk::{self, chunk::*};
 use crate::chunk::job::*;
 use crate::chunk::jobmanager::ChunkJobManager;
+use crate::renderer::mesh::Mesh;
 use crate::renderer::renderer::Renderer;
 use crate::texture::texture::TextureAtlas;
+use crate::utils::direction::Direction;
 
-const MAX_RESULTS_PER_FRAME: usize = 32;
-const MAX_LOADS_PER_FRAME: usize = 16;
-const MAX_UNLOADS_PER_FRAME: usize = 16;
+pub struct ChunkManagerRequest {
+    lat_render_dist: u32,
+    vert_render_dist: u32,
+    cam_chunk_pos: IVec3,
+    chunks: HashSet<IVec3>,
+    loaded: HashSet<IVec3>,
+}
+
+pub struct ChunkManagerResult {
+    position: IVec3,
+    chunk: Option<Chunk>,
+    to_load: Vec<IVec3>,
+    to_unload: Vec<IVec3>,
+}
 
 pub struct GameState {
     pub camera: Camera,
@@ -26,49 +42,206 @@ pub struct GameState {
     pub lateral_render_distance: u32,
     pub vertical_render_distance: u32,
 
-    pub chunks: HashMap<IVec3, Chunk>,
-    chunk_job_manager: ChunkJobManager,
-    awaiting_terrain_gen: HashSet<IVec3>,
-    awaiting_mesh_gen: HashSet<IVec3>,
-    chunks_to_load: Vec<IVec3>,
-    chunks_to_unload: Vec<IVec3>,
+    chunks: HashMap<IVec3, Chunk>,
+    loaded: HashSet<IVec3>,
 
     pub prev_cam_chunk_pos: IVec3,
     pub needs_chunk_load_refresh: bool,
+
+    request_sender: Sender<ChunkManagerRequest>,
+    result_receiver: Receiver<ChunkManagerResult>
 }
 
 impl GameState {
     pub async fn new(atlas: &TextureAtlas) -> anyhow::Result<Self> {
-        Ok(
-            Self {
-                camera: Camera {
-                    position: Vec3::new(0.0, 16.0, 0.0),
-                    yaw: 0.0,
-                    pitch: 0.0,
-                    fov: 60.0_f32.to_radians(),
-                    aspect_ratio: 16.0 / 9.0,
-                },
-                last_frame_tick: Instant::now(),
-                lateral_render_distance: 8,
-                vertical_render_distance: 6,
-                chunks: HashMap::new(),
-                chunk_job_manager: ChunkJobManager::new(64, atlas),
-                awaiting_terrain_gen: HashSet::new(),
-                awaiting_mesh_gen: HashSet::new(),
-                chunks_to_load: Vec::new(),
-                chunks_to_unload: Vec::new(),
-                prev_cam_chunk_pos: IVec3::new(0, 0, 0),
-                needs_chunk_load_refresh: true,
-            }
-        )
+        let (request_sender, request_receiver) = crossbeam_channel::unbounded();
+        let (result_sender, result_receiver) = crossbeam_channel::unbounded();
+
+        let new = Self {
+            camera: Camera {
+                position: Vec3::new(0.0, 16.0, 0.0),
+                yaw: 0.0,
+                pitch: 0.0,
+                fov: 60.0_f32.to_radians(),
+                aspect_ratio: 16.0 / 9.0,
+            },
+            last_frame_tick: Instant::now(),
+            lateral_render_distance: 4,
+            vertical_render_distance: 3,
+            chunks: HashMap::new(),
+            loaded: HashSet::new(),
+            prev_cam_chunk_pos: IVec3::new(0, 0, 0),
+            needs_chunk_load_refresh: true,
+            request_sender,
+            result_receiver,
+        };
+
+        Self::setup_chunk_manager_thread(request_receiver, result_sender, atlas);
+
+        Ok(new)
     }
+
+    pub fn setup_chunk_manager_thread(
+            request_receiver: Receiver<ChunkManagerRequest>,
+            result_sender: Sender<ChunkManagerResult>,
+            atlas: &TextureAtlas,
+        ) {
+            let atlas = atlas.clone();
+
+            std::thread::spawn(move || {
+                let mut active_request = false;
+
+                let mut cam_chunk_pos: IVec3;
+
+                let mut min: IVec3 = IVec3::new(0, 0, 0);
+                let mut max: IVec3 = IVec3::new(0, 0, 0);
+
+                let mut chunks: HashSet<IVec3> = HashSet::new();
+                let mut loaded: HashSet<IVec3> = HashSet::new();
+
+                let mut visited: HashSet<IVec3> = HashSet::new();
+                let mut frontier: HashSet<IVec3> = HashSet::new();
+
+                let mut to_load: Vec<IVec3> = Vec::new();
+                let mut to_unload: Vec<IVec3>;
+
+                let chunk_job_manager = ChunkJobManager::new(8, &atlas);
+
+                loop {
+                    match request_receiver.try_recv() {
+                        Ok(request) => {
+                            // Reset the area loading
+
+                            cam_chunk_pos = request.cam_chunk_pos;
+
+                            min = IVec3::new(
+                                cam_chunk_pos.x - request.lat_render_dist as i32,
+                                cam_chunk_pos.y - request.vert_render_dist as i32,
+                                cam_chunk_pos.z - request.lat_render_dist as i32,
+                            );
+                            max = IVec3::new(
+                                cam_chunk_pos.x + request.lat_render_dist as i32,
+                                cam_chunk_pos.y + request.vert_render_dist as i32,
+                                cam_chunk_pos.z + request.lat_render_dist as i32,
+                            );
+
+                            chunks = request.chunks;
+                            loaded = request.loaded;
+
+                            visited = HashSet::new();
+                            frontier = HashSet::new();
+                            frontier.insert(cam_chunk_pos);
+
+                            to_load = Vec::new();
+                            to_unload = Vec::new();
+
+                            for p in &loaded {
+                                if p.x < min.x || p.x > max.x ||
+                                   p.y < min.y || p.y > max.y ||
+                                   p.z < min.z || p.z > max.z
+                                {
+                                    to_unload.push(*p);
+                                }
+                            }
+
+                            result_sender.send(
+                                ChunkManagerResult {
+                                    position: IVec3::new(0, 0, 0),
+                                    chunk: None,
+                                    to_load: Vec::new(),
+                                    to_unload,
+                                }
+                            ).expect("Failed to send unload result");
+
+                            active_request = true;
+                        },
+                        Err(_) => {
+                            // Contunue the area loading as normal
+
+                            if !active_request { continue; }
+
+                            let mut new_frontier: HashSet<IVec3> = HashSet::new();
+
+                            for p in frontier.drain() {
+                                for d in Direction::all() {
+                                    let neighbour = d.rel_vec() + p;
+
+                                    if visited.contains(&neighbour) ||
+                                       neighbour.x < min.x || neighbour.x > max.x ||
+                                       neighbour.y < min.y || neighbour.y > max.y ||
+                                       neighbour.z < min.z || neighbour.z > max.z
+                                    { continue; }
+
+                                    if chunks.contains(&neighbour) {
+                                        if !loaded.contains(&neighbour) {
+                                            loaded.insert(neighbour);
+                                            to_load.push(neighbour);
+                                        }
+                                    } else {
+                                        chunk_job_manager.submit_job(
+                                            ChunkJob {
+                                                type_: JobType::GenTerrain,
+                                                position: neighbour,
+                                                chunk: Chunk::new(),
+                                            }
+                                        );
+                                    }
+
+                                    visited.insert(p);
+                                    new_frontier.insert(neighbour);
+                                }
+                            }
+
+                            frontier = new_frontier;
+                        },
+                    }
+
+                    if let Some(result) = chunk_job_manager.get_result() {
+                        match result.type_ {
+                            JobType::GenMesh => {
+                                result_sender.send(
+                                    ChunkManagerResult {
+                                        position: result.position,
+                                        chunk: Some(result.chunk),
+                                        to_load,
+                                        to_unload: Vec::new(),
+                                    }
+                                ).expect("Failed to send generation result");
+                                to_load = Vec::new();
+                            },
+                            JobType::GenTerrain => {
+                                chunk_job_manager.submit_job(
+                                    ChunkJob {
+                                        type_: JobType::GenMesh,
+                                        position: result.position,
+                                        chunk: result.chunk,
+                                    }
+                                );
+                            }
+                        }
+                    } else {
+                        if to_load.len() > 0 {
+                            result_sender.send(
+                                ChunkManagerResult {
+                                    position: IVec3::new(0, 0, 0),
+                                    chunk: None,
+                                    to_load,
+                                    to_unload: Vec::new(),
+                                }
+                            ).expect("Failed to send loading result");
+                            to_load = Vec::new();
+                        }
+                    }
+                }
+            });
+        }
 
     pub fn game_tick(&mut self) {
 
     }
 
     fn handle_movement(&mut self, input_man: &InputManager, dt: f32) {
-        let move_speed = 8.0;
+        let move_speed = 10.0;
         
         if input_man.is_pressed(KeyCode::ArrowLeft) {
             self.camera.yaw += PI / 2.0 * dt;
@@ -110,52 +283,6 @@ impl GameState {
         }
     }
 
-    // TODO: handle this in a separate thread to remove stutters
-    fn chunk_load_refresh(&mut self, cam_chunk_pos: IVec3) {
-        let min = IVec3::new(
-            cam_chunk_pos.x - self.lateral_render_distance as i32,
-            cam_chunk_pos.y - self.vertical_render_distance as i32,
-            cam_chunk_pos.z - self.lateral_render_distance as i32,
-        );
-        let max = IVec3::new(
-            cam_chunk_pos.x + self.lateral_render_distance as i32,
-            cam_chunk_pos.y + self.vertical_render_distance as i32,
-            cam_chunk_pos.z + self.lateral_render_distance as i32,
-        );
-
-        let mut chunk_positions: Vec<_> = (min.x..=max.x)
-            .flat_map(|x| (min.y..=max.y).flat_map(move |y| (min.z..=max.z).map(move |z| IVec3::new(x, y, z))))
-            .collect();
-
-        for p in self.chunks.keys() {
-            if chunk_positions.contains(p) ||
-               self.chunks_to_unload.contains(p) ||
-               !self.chunks.get(p).unwrap().loaded {
-                continue;
-            }
-
-            self.chunks_to_unload.push(p.clone());
-        }
-
-        chunk_positions.sort_by_key(|pos| {
-            let delta = *pos - cam_chunk_pos;
-            Reverse(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z)
-        });
-
-        for p in chunk_positions {
-            match self.chunks.get(&p) {
-                Some(c) => {
-                    if !c.loaded && !c.all_air {
-                        self.chunks_to_load.push(p);
-                    }
-                },
-                None => {
-                    self.chunks_to_load.push(p);
-                },
-            }
-        }
-    }
-
     pub fn frame_tick(&mut self, input_man: &InputManager, renderer: &mut Renderer) {
         let now = Instant::now();
         let dt = now.duration_since(self.last_frame_tick).as_secs_f32() / 1.0;
@@ -171,88 +298,52 @@ impl GameState {
         }
 
         if self.needs_chunk_load_refresh {
-            println!("Chunk load refresh!");
-            self.chunk_load_refresh(cam_chunk_pos);
+            self.request_sender.send(
+                ChunkManagerRequest {
+                    lat_render_dist: self.lateral_render_distance,
+                    vert_render_dist: self.vertical_render_distance,
+                    cam_chunk_pos,
+                    chunks: self.chunks.keys().copied().collect(),
+                    loaded: self.loaded.clone(),
+                }
+            ).unwrap();
+
             self.needs_chunk_load_refresh = false;
         }
 
+        for _ in 0..512 {
+            match self.result_receiver.try_recv() {
+                Ok(result) => {
+                    match result.chunk {
+                        Some(chunk) => {
+                            renderer.upload_chunk_mesh(
+                                result.position, 
+                                &chunk.mesh,
+                            );
 
-        // TODO: use maximum time spent processing this (and things like it) rather than hard cap
-        for _ in 0..MAX_LOADS_PER_FRAME {
-            if self.chunks_to_load.len() == 0 { break; }
-
-            let chunk_pos = self.chunks_to_load.pop().unwrap();
-
-            if self.chunks.contains_key(&chunk_pos) {
-                let chunk = self.chunks.get_mut(&chunk_pos).unwrap();
-
-                if !chunk.loaded {
-                    chunk.loaded = true;
-                    renderer.upload_chunk_mesh(chunk_pos, &chunk.mesh);
-                    if !chunk.meshed || chunk.needs_remesh {
-                        self.chunk_job_manager.submit_job(
-                            ChunkJob {
-                                type_: JobType::GenTerrain,
-                                position: chunk_pos,
-                                chunk: chunk.clone(),
-                            }
-                        );
-                        self.awaiting_mesh_gen.insert(chunk_pos);
+                            self.chunks.insert(result.position, chunk);
+                            self.loaded.insert(result.position);
+                        },
+                        None => {},
                     }
-                }
-            } else {
-                if !self.awaiting_terrain_gen.contains(&chunk_pos) {
-                    self.chunk_job_manager.submit_job(
-                        ChunkJob {
-                            type_: JobType::GenTerrain,
-                            position: chunk_pos,
-                            chunk: Chunk::new(),
+
+                    for p in result.to_load {
+                        if !self.loaded.contains(&p) {
+                            renderer.upload_chunk_mesh(p, &self.chunks.get(&p).expect("Chunk to load not found").mesh);
+                            self.loaded.insert(p);
                         }
-                    );
-                    self.awaiting_terrain_gen.insert(chunk_pos);
-                }
-            }
-        }
+                    }
 
-        for _ in 0..MAX_UNLOADS_PER_FRAME {
-            if self.chunks_to_unload.len() == 0 { break; }
-
-            let chunk_pos = self.chunks_to_unload.pop().unwrap();
-
-            if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
-                chunk.loaded = false;
-            }
-
-            renderer.remove_chunk_mesh(chunk_pos);
-        }
-
-        for _ in 0..MAX_RESULTS_PER_FRAME {
-            let Some(mut result) = self.chunk_job_manager.get_result() else {
-                break;
-            };
-
-            match result.type_ {
-                JobType::GenTerrain => {
-                    self.awaiting_terrain_gen.remove(&result.position);
-
-                    self.chunk_job_manager.submit_job(
-                        ChunkJob {
-                            type_: JobType::GenMesh,
-                            position: result.position,
-                            chunk: result.chunk.clone(),
+                    for p in result.to_unload {
+                        if self.loaded.contains(&p) {
+                            renderer.remove_chunk_mesh(p);
+                            self.loaded.remove(&p);
                         }
-                    );
-                    self.awaiting_mesh_gen.insert(result.position);
+                    }
                 },
-                JobType::GenMesh => {
-                    self.awaiting_mesh_gen.remove(&result.position);
-                    renderer.upload_chunk_mesh(result.position, &result.chunk.mesh);
-                },
+                Err(_) => { break; },
             }
-
-            result.chunk.loaded = true;
-            self.chunks.insert(result.position, result.chunk);
-        }
+    }
     }
 
     pub fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
