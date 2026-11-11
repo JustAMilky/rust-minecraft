@@ -2,12 +2,20 @@ use glam::IVec3;
 
 use crate::chunk::chunk::*;
 
-pub enum ChunkJob {
-    GenTerrain((IVec3, Chunk)),
-    GenMesh((IVec3, Chunk)),
+#[derive(Debug)]
+pub enum JobType {
+    GenTerrain,
+    GenMesh,
+}
+
+pub struct ChunkJob {
+    pub type_: JobType,
+    pub position: IVec3,
+    pub chunk: Chunk,
 }
 
 pub struct ChunkJobResult {
-    position: IVec3,
-    chunk: Chunk,
+    pub type_: JobType,
+    pub position: IVec3,
+    pub chunk: Chunk,
 }

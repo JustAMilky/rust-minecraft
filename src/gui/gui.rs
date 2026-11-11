@@ -6,6 +6,7 @@ pub struct Gui {
     pub renderer: egui_wgpu::Renderer,
 
     pub fps: f32,
+    pub tps: f32,
 }
 
 impl Gui {
@@ -33,12 +34,14 @@ impl Gui {
                 state,
                 renderer,
                 fps: 0.0,
+                tps: 0.0,
             }
         )
     }
 
-    pub fn update(&mut self, fps: f32) {
+    pub fn update(&mut self, fps: f32, tps: f32) {
         self.fps = fps;
+        self.tps = tps;
     }
 
     pub fn render(
@@ -71,6 +74,7 @@ impl Gui {
                         .show(ui, |ui| {
                             let lines = [
                                 format!("FPS: {:.0}", self.fps),
+                                format!("TPS: {:.0}", self.tps),
                                 format!(
                                     "Frame: {:.2} ms",
                                     1000.0 / self.fps.max(0.001)

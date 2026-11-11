@@ -17,6 +17,9 @@ pub struct App {
     gui: Option<Gui>,
 
     fps: f32,
+    tps: f32,
+    ticks_since_tps_update: u32,
+    last_tps_update: Instant,
     last_frame: std::time::Instant,
     last_tick: std::time::Instant,
     tick_interval: Duration,
@@ -34,6 +37,9 @@ impl App {
             renderer: None,
             gui: None,
             fps: 0.0,
+            tps: 0.0,
+            ticks_since_tps_update: 0,
+            last_tps_update: Instant::now(),
             last_frame: Instant::now(),
             last_tick: Instant::now(),
             tick_interval: Duration::from_millis(50),
@@ -55,7 +61,7 @@ impl ApplicationHandler<()> for App {
         );
 
         let state = pollster::block_on(
-            GameState::new()
+            GameState::new(&self.texture_atlas)
         ).unwrap();
 
         self.state = Some(state);
@@ -88,8 +94,16 @@ impl ApplicationHandler<()> for App {
 
             self.state
                 .as_mut()
-                .expect("Unable to update game state")
+                .expect("Unable to execute game tick")
                 .game_tick();
+            self.ticks_since_tps_update += 1;
+        }
+
+        let tps_elapsed = now.duration_since(self.last_tps_update);
+        if tps_elapsed >= Duration::from_secs(1) {
+            self.tps = self.ticks_since_tps_update as f32 / tps_elapsed.as_secs_f32();
+            self.ticks_since_tps_update = 0;
+            self.last_tps_update = now;
         }
 
         if let Some(window) = &self.window {
@@ -105,7 +119,7 @@ impl ApplicationHandler<()> for App {
     ) {
         let (Some(window), Some(state), Some(renderer), Some(gui)) = (
             self.window.as_ref(),
-            self.state.as_ref(),
+            self.state.as_mut(),
             self.renderer.as_mut(),
             self.gui.as_mut(),
         ) else {
@@ -126,7 +140,12 @@ impl ApplicationHandler<()> for App {
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => renderer.resize(size.width, size.height),
+            WindowEvent::Resized(size) => {
+                renderer.resize(size.width, size.height);
+                if size.height > 0 {
+                    state.camera.aspect_ratio = size.width as f32 / size.height as f32;
+                }
+            }
             WindowEvent::RedrawRequested => {
                 let now = Instant::now();
                 let delta = now.duration_since(self.last_frame).as_secs_f32();
@@ -134,14 +153,11 @@ impl ApplicationHandler<()> for App {
                 self.last_frame = now;
                 self.fps = 1.0 / delta.max(0.000001);
 
-                gui.update(self.fps);
+                gui.update(self.fps, self.tps);
 
-                self.state
-                    .as_mut()
-                    .expect("Unable to update game state: No game state")
-                    .frame_tick(&self.input_man);
+                state.frame_tick(&self.input_man, renderer);
 
-                match renderer.render(window, gui, &self.state.as_ref().expect("Cannot create renderer: no GameState").camera) {
+                match renderer.render(window, gui, &state.camera) {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("{e}");

@@ -69,11 +69,13 @@ impl TextureRegistry {
     }
 }
 
+#[derive(Clone)]
 pub struct AtlasRegion {
     pub min: [f32; 2],
     pub max: [f32; 2],
 }
 
+#[derive(Clone)]
 pub struct TextureAtlas {
     pub width: u32,
     pub height: u32,

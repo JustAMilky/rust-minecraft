@@ -11,14 +11,13 @@ pub fn populate_model_registry(model_registry: &mut ModelRegistry) {
     ]);
 }
 
-fn air_model() -> BlockModel {
+pub fn air_model() -> BlockModel {
     BlockModel {
         elements: vec![],
-        textures: HashMap::new(),
     }
 }
 
-fn stone_model() -> BlockModel {
+pub fn stone_model() -> BlockModel {
     BlockModel {
         elements: vec![
             ModelElement {
@@ -31,18 +30,18 @@ fn stone_model() -> BlockModel {
                     (Direction::South, ModelFace { direction: Direction::South, uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::South, texture: "all".to_string() }),
                     (Direction::East,  ModelFace { direction: Direction::East,  uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::East,  texture: "all".to_string() }),
                     (Direction::West,  ModelFace { direction: Direction::West,  uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::West,  texture: "all".to_string() }),
+                ]),
+                textures: HashMap::from([
+                    ("all".to_string(), TextureId::Stone),
                 ])
             },
         ],
-        textures: HashMap::from([
-            ("all".to_string(), TextureId::Stone),
-        ])
     }
 }
 
-fn _dirt_model() -> BlockModel {
+pub fn _dirt_model() -> BlockModel {
     let mut model = stone_model();
-    model.textures = HashMap::from([
+    model.elements[0].textures = HashMap::from([
         ("all".to_string(), TextureId::Dirt),
     ]);
     model
