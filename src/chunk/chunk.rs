@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use glam::{Vec3, IVec3};
+use glam::IVec3;
 use crate::{block::blockstate::BlockState, renderer::mesh::Mesh, texture::texture::TextureAtlas, utils::direction::Direction};
 
 pub const CHUNK_SIZE: i32 = 32;
@@ -57,43 +57,108 @@ impl Chunk {
     }
 }
 
-pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, _neighbours: HashMap<Direction, &Chunk>, atlas: &TextureAtlas) -> Mesh {
+pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direction, Chunk>, atlas: &TextureAtlas) -> Mesh {
     let mut mesh = Mesh::new();
 
     let size = CHUNK_SIZE as usize;
-    let chunk_origin = (chunk_pos * CHUNK_SIZE).as_vec3();
+    let chunk_origin = chunk_pos * CHUNK_SIZE;
 
     for (index, block) in chunk.blocks.iter().enumerate() {
+        if matches!(block, BlockState::Air) { continue; }
+
         let x = index % size;
         let y = (index / size) % size;
         let z = index / (size * size);
 
-        let local_pos = Vec3::new(
-            x as f32,
-            y as f32,
-            z as f32,
+        let local_pos = IVec3::new(
+            x as i32,
+            y as i32,
+            z as i32,
         );
 
-        let mut cull_faces: Vec<Direction> = Vec::new();
+        let mut cull_faces: HashSet<Direction> = HashSet::new();
 
         for d in Direction::all() {
-            let neighbour = local_pos.as_ivec3() + d.rel_vec();
+            let neighbour = local_pos + d.rel_vec();
 
             if neighbour.x >= 0 && neighbour.x < CHUNK_SIZE &&
                neighbour.y >= 0 && neighbour.y < CHUNK_SIZE &&
                neighbour.z >= 0 && neighbour.z < CHUNK_SIZE {
                 if chunk.get_block_at(neighbour).get_block().is_solid() {
-                    cull_faces.push(d);
+                    cull_faces.insert(d);
+                }
+            } else {
+                let neighbour_block = if let Some(neighbour_chunk) = neighbours.get(&d) {
+                    match d {
+                        Direction::Up => {
+                            neighbour_chunk.get_block_at(
+                                IVec3::new(
+                                    local_pos.x,
+                                    0,
+                                    local_pos.z,
+                                )
+                            )
+                        },
+                        Direction::Down => {
+                            neighbour_chunk.get_block_at(
+                                IVec3::new(
+                                    local_pos.x,
+                                    CHUNK_SIZE - 1,
+                                    local_pos.z,
+                                )
+                            )
+                        },
+                        Direction::North => {
+                            neighbour_chunk.get_block_at(
+                                IVec3::new(
+                                    local_pos.x,
+                                    local_pos.y,
+                                    CHUNK_SIZE - 1,
+                                )
+                            )
+                        },
+                        Direction::South => {
+                            neighbour_chunk.get_block_at(
+                                IVec3::new(
+                                    local_pos.x,
+                                    local_pos.y,
+                                    0,
+                                )
+                            )
+                        },
+                        Direction::East => {
+                            neighbour_chunk.get_block_at(
+                                IVec3::new(
+                                    0,
+                                    local_pos.y,
+                                    local_pos.z,
+                                )
+                            )
+                        },
+                        Direction::West => {
+                            neighbour_chunk.get_block_at(
+                                IVec3::new(
+                                    CHUNK_SIZE - 1,
+                                    local_pos.y,
+                                    local_pos.z,
+                                )
+                            )
+                        },
+                    }
+                } else {
+                    BlockState::Air
+                };
+
+                if neighbour_block.get_block().is_solid() {
+                    cull_faces.insert(d);
                 }
             }
         }
 
+        if cull_faces.len() == 6 { continue; }
+
         let model = block.get_block().get_model(block);
-        let block_mesh = model
-            .get_mesh(cull_faces, atlas)
-            .scaled(1.0 / 16.0)
-            .translated(chunk_origin + local_pos);
-        mesh.add_mesh(&block_mesh);
+        model.add_own_mesh_to_mesh(&mut mesh, cull_faces, (chunk_origin + local_pos).as_vec3(), atlas);
     }
 
     mesh
@@ -178,4 +243,5 @@ mod tests {
         assert!(mesh.vertices.is_empty());
         assert!(mesh.indicies.is_empty());
     }
+
 }

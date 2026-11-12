@@ -13,6 +13,7 @@ mod utils;
 mod texture;
 mod camera;
 mod chunk;
+mod worldgen;
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();

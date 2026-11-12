@@ -1,0 +1,147 @@
+   Compiling minecraft v0.1.0 (/home/TheGirl790/Projects/rust-minecraft)
+warning: unused import: `RecvTimeoutError`
+ --> src/gamestate/gamestate.rs:4:35
+  |
+4 | use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+  |                                   ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `self`
+  --> src/gamestate/gamestate.rs:14:20
+   |
+14 | use crate::chunk::{self, chunk::*};
+   |                    ^^^^
+
+warning: unused import: `self`
+  --> src/gamestate/gamestate.rs:19:31
+   |
+19 | use crate::utils::direction::{self, Direction};
+   |                               ^^^^
+
+warning: unused import: `std::time::Instant`
+ --> src/chunk/jobmanager.rs:4:5
+  |
+4 | use std::time::Instant;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::utils::direction::Direction`
+  --> src/chunk/jobmanager.rs:14:5
+   |
+14 | use crate::utils::direction::Direction;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `hash::Hash` and `time::Duration`
+ --> src/chunk/job.rs:1:33
+  |
+1 | use std::{collections::HashMap, hash::Hash, time::Duration};
+  |                                 ^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused variable: `vertex_buffer`
+   --> src/renderer/renderer.rs:314:13
+    |
+314 |         let vertex_buffer = device.create_buffer_init(
+    |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_vertex_buffer`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `index_buffer`
+   --> src/renderer/renderer.rs:321:13
+    |
+321 |         let index_buffer = device.create_buffer_init(
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_index_buffer`
+
+warning: unused variable: `num_vertices`
+   --> src/renderer/renderer.rs:329:13
+    |
+329 |         let num_vertices = VERTICES.len() as u32;
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_num_vertices`
+
+warning: unused variable: `num_indices`
+   --> src/renderer/renderer.rs:330:13
+    |
+330 |         let num_indices = INDICES.len() as u32;
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_num_indices`
+
+warning: value assigned to `pixels` is never read
+  --> src/texture/texture.rs:34:30
+   |
+34 |             let mut pixels = Vec::new();
+   |                              ^^^^^^^^^^ this value is reassigned later and never used
+...
+41 |                     pixels = i.clone().into_rgba8().into_raw();
+   |                     ------ `pixels` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `chunks`
+  --> src/chunk/jobmanager.rs:24:86
+   |
+24 |     pub fn new(num_threads: usize, world_generator_settings: WorldGeneratorSettings, chunks: Arc<Mutex<HashMap<IVec3, Chunk>>>, atlas: &TextureAtlas) -> Self {
+   |                                                                                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_chunks`
+
+warning: fields `window` and `texture` are never read
+  --> src/renderer/renderer.rs:62:9
+   |
+56 | pub struct Renderer {
+   |            -------- fields in this struct
+...
+62 |     pub window: Arc<Window>,
+   |         ^^^^^^
+...
+70 |     pub texture: wgpu::Texture,
+   |         ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `get_vertices`, `get_indicies`, and `scaled` are never used
+  --> src/renderer/mesh.rs:19:12
+   |
+11 | impl Mesh {
+   | --------- methods in this implementation
+...
+19 |     pub fn get_vertices(&self) -> &[Vertex] {
+   |            ^^^^^^^^^^^^
+...
+23 |     pub fn get_indicies(&self) -> &[u32] {
+   |            ^^^^^^^^^^^^
+...
+47 |     pub fn scaled(&self, scale: f32) -> Self {
+   |            ^^^^^^
+
+warning: method `name` is never used
+ --> src/block/block.rs:5:8
+  |
+4 | pub trait Block {
+  |           ----- method in this trait
+5 |     fn name(&self) -> &str;
+  |        ^^^^
+
+warning: method `opposite` is never used
+  --> src/utils/direction.rs:38:12
+   |
+15 | impl Direction {
+   | -------------- method in this implementation
+...
+38 |     pub fn opposite(&self) -> Self {
+   |            ^^^^^^^^
+
+warning: field `settings` is never read
+  --> src/worldgen/worldgenerator.rs:14:5
+   |
+13 | pub struct WorldGenerator {
+   |            -------------- field in this struct
+14 |     settings: WorldGeneratorSettings,
+   |     ^^^^^^^^
+
+warning: variable `Result` should have a snake case name
+   --> src/chunk/jobmanager.rs:133:16
+    |
+133 |             Ok(Result) => Some(Result),
+    |                ^^^^^^ help: convert the identifier to snake case: `result`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: `minecraft` (bin "minecraft") generated 18 warnings (run `cargo fix --bin "minecraft" -p minecraft` to apply 11 suggestions)
+    Finished `release` profile [optimized] target(s) in 3.05s
+     Running `target/release/minecraft`

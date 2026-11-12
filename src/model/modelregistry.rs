@@ -24,12 +24,12 @@ pub fn stone_model() -> BlockModel {
                 from: [0.0, 0.0, 0.0],
                 to: [16.0, 16.0, 16.0],
                 faces: HashMap::from([
-                    (Direction::Up,    ModelFace { direction: Direction::Up,    uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::Up,    texture: "all".to_string() }),
-                    (Direction::Down,  ModelFace { direction: Direction::Down,  uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::Down,  texture: "all".to_string() }),
-                    (Direction::North, ModelFace { direction: Direction::North, uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::North, texture: "all".to_string() }),
-                    (Direction::South, ModelFace { direction: Direction::South, uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::South, texture: "all".to_string() }),
-                    (Direction::East,  ModelFace { direction: Direction::East,  uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::East,  texture: "all".to_string() }),
-                    (Direction::West,  ModelFace { direction: Direction::West,  uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::West,  texture: "all".to_string() }),
+                    (Direction::Up,    ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::Up,    texture: "all".to_string() }),
+                    (Direction::Down,  ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::Down,  texture: "all".to_string() }),
+                    (Direction::North, ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::North, texture: "all".to_string() }),
+                    (Direction::South, ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::South, texture: "all".to_string() }),
+                    (Direction::East,  ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::East,  texture: "all".to_string() }),
+                    (Direction::West,  ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::West,  texture: "all".to_string() }),
                 ]),
                 textures: HashMap::from([
                     ("all".to_string(), TextureId::Stone),

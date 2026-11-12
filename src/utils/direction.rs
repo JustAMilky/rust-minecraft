@@ -34,4 +34,15 @@ impl Direction {
             Direction::West => IVec3::new(-1, 0, 0),
         }
     }
+
+    pub fn opposite(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::North => Direction::South,
+            Direction::South => Direction::North,
+            Direction::East => Direction::West,
+            Direction::West => Direction::East,
+        }
+    }
 }

@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+use glam::Vec3;
 
 use crate::renderer::mesh::Mesh;
 use crate::renderer::vertex::Vertex;
@@ -31,14 +33,10 @@ pub struct BlockModel {
 }
 
 impl BlockModel {
-    pub fn get_mesh(&self, cull_faces: Vec<Direction>, atlas: &TextureAtlas) -> Mesh {
-        let mut mesh = Mesh::new();
-
+    pub fn add_own_mesh_to_mesh(&self, mesh: &mut Mesh, cull_faces: HashSet<Direction>, offset: Vec3, atlas: &TextureAtlas) {
         for e in &self.elements {
-            mesh.add_mesh(&e.get_mesh(&cull_faces, &atlas));
+            e.add_own_mesh_to_mesh(mesh, &cull_faces, offset, &atlas);
         }
-
-        mesh
     }
 }
 
@@ -50,9 +48,7 @@ pub struct ModelElement {
 }
 
 impl ModelElement {
-    pub fn get_mesh(&self, cull_faces: &Vec<Direction>, atlas: &TextureAtlas) -> Mesh {
-        let mut mesh = Mesh::new();
-
+    pub fn add_own_mesh_to_mesh(&self, mesh: &mut Mesh, cull_faces: &HashSet<Direction>, offset: Vec3, atlas: &TextureAtlas) {
         for f in &self.faces {
             let (direction, face) = f;
 
@@ -72,14 +68,25 @@ impl ModelElement {
                 map_face_uv([face.uv[0], face.uv[3]], texture_region, atlas),
             ];
 
+            let from = [
+                self.from[0] / 16.0,
+                self.from[1] / 16.0,
+                self.from[2] / 16.0,
+            ];
+            let to = [
+                self.to[0] / 16.0,
+                self.to[1] / 16.0,
+                self.to[2] / 16.0,
+            ];
+
             mesh.add_mesh(&match direction {
                 Direction::Down => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.from[0], self.from[1], self.from[2]], colour: WHITE, uv: uv[0] },
-                            Vertex { position: [self.to[0],   self.from[1], self.from[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.to[0],   self.from[1], self.to[2]],   colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.from[0], self.from[1], self.to[2]],   colour: WHITE, uv: uv[3] },
+                            Vertex { position: [from[0], from[1], from[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [to[0],   from[1], from[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [to[0],   from[1], to[2]],   colour: WHITE, uv: uv[2] },
+                            Vertex { position: [from[0], from[1], to[2]],   colour: WHITE, uv: uv[3] },
                         ],
                         indicies: vec![0, 1, 2, 0, 2, 3],
                     }
@@ -88,10 +95,10 @@ impl ModelElement {
                 Direction::Up => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.from[0], self.to[1],   self.from[2]], colour: WHITE, uv: uv[0] },
-                            Vertex { position: [self.to[0],   self.to[1],   self.from[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.to[0],   self.to[1],   self.to[2]],   colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.from[0], self.to[1],   self.to[2]],   colour: WHITE, uv: uv[3] },
+                            Vertex { position: [from[0], to[1],   from[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [to[0],   to[1],   from[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [to[0],   to[1],   to[2]],   colour: WHITE, uv: uv[2] },
+                            Vertex { position: [from[0], to[1],   to[2]],   colour: WHITE, uv: uv[3] },
                         ],
                         indicies: vec![0, 2, 1, 0, 3, 2],
                     }
@@ -100,59 +107,57 @@ impl ModelElement {
                 Direction::East => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.to[0], self.to[1],   self.from[2]], colour: WHITE, uv: uv[0] },
-                            Vertex { position: [self.to[0], self.from[1], self.from[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.to[0], self.from[1], self.to[2]],   colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.to[0], self.to[1],   self.to[2]],   colour: WHITE, uv: uv[3] },
+                            Vertex { position: [to[0], to[1],   from[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [to[0], from[1], from[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [to[0], from[1], to[2]],   colour: WHITE, uv: uv[2] },
+                            Vertex { position: [to[0], to[1],   to[2]],   colour: WHITE, uv: uv[3] },
                         ],
-                        indicies: vec![0, 1, 2, 0, 2, 3],
+                        indicies: vec![0, 2, 1, 0, 3, 2],
                     }
                 },
 
                 Direction::West => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.from[0], self.to[1],   self.from[2]], colour: WHITE, uv: uv[0] },
-                            Vertex { position: [self.from[0], self.from[1], self.from[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.from[0], self.from[1], self.to[2]],   colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.from[0], self.to[1],   self.to[2]],   colour: WHITE, uv: uv[3] },
+                            Vertex { position: [from[0], to[1],   from[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [from[0], from[1], from[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [from[0], from[1], to[2]],   colour: WHITE, uv: uv[2] },
+                            Vertex { position: [from[0], to[1],   to[2]],   colour: WHITE, uv: uv[3] },
                         ],
-                        indicies: vec![0, 2, 1, 0, 3, 2],
+                        indicies: vec![0, 1, 2, 0, 2, 3],
                     }
                 },
 
                 Direction::South => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.from[0], self.to[1],   self.to[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.to[0],   self.to[1],   self.to[2]], colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.to[0],   self.from[1], self.to[2]], colour: WHITE, uv: uv[3] },
-                            Vertex { position: [self.from[0], self.from[1], self.to[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [from[0], to[1],   to[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [to[0],   to[1],   to[2]], colour: WHITE, uv: uv[2] },
+                            Vertex { position: [to[0],   from[1], to[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [from[0], from[1], to[2]], colour: WHITE, uv: uv[0] },
                         ],
-                        indicies: vec![0, 1, 2, 0, 2, 3],
+                        indicies: vec![0, 2, 1, 0, 3, 2],
                     }
                 },
 
                 Direction::North => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [self.from[0], self.to[1],   self.from[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [self.to[0],   self.to[1],   self.from[2]], colour: WHITE, uv: uv[2] },
-                            Vertex { position: [self.to[0],   self.from[1], self.from[2]], colour: WHITE, uv: uv[3] },
-                            Vertex { position: [self.from[0], self.from[1], self.from[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [from[0], to[1],   from[2]], colour: WHITE, uv: uv[1] },
+                            Vertex { position: [to[0],   to[1],   from[2]], colour: WHITE, uv: uv[2] },
+                            Vertex { position: [to[0],   from[1], from[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [from[0], from[1], from[2]], colour: WHITE, uv: uv[0] },
                         ],
-                        indicies: vec![0, 2, 1, 0, 3, 2],
+                        indicies: vec![0, 1, 2, 0, 2, 3],
                     }
                 },
-            });
+            }.translated(offset)
+        );
         }
-
-        mesh
     }
 }
 
 pub struct ModelFace {
-    pub direction: Direction,
     pub uv: [f32; 4],
     pub texture: String,
     pub cullface: Direction,
