@@ -143,5 +143,5 @@ warning: variable `Result` should have a snake case name
     = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
 
 warning: `minecraft` (bin "minecraft") generated 18 warnings (run `cargo fix --bin "minecraft" -p minecraft` to apply 11 suggestions)
-    Finished `release` profile [optimized] target(s) in 3.05s
+    Finished `release` profile [optimized] target(s) in 2.88s
      Running `target/release/minecraft`

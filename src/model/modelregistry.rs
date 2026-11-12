@@ -1,5 +1,7 @@
 use std::{collections::HashMap, vec};
 
+use winit::window::CursorIcon::Text;
+
 use crate::model::model::*;
 use crate::utils::direction::Direction;
 use crate::texture::texture::TextureId;
@@ -39,10 +41,34 @@ pub fn stone_model() -> BlockModel {
     }
 }
 
-pub fn _dirt_model() -> BlockModel {
+pub fn dirt_model() -> BlockModel {
     let mut model = stone_model();
     model.elements[0].textures = HashMap::from([
         ("all".to_string(), TextureId::Dirt),
     ]);
     model
+}
+
+pub fn grass_model() -> BlockModel {
+    BlockModel {
+        elements: vec![
+            ModelElement {
+                from: [0.0, 0.0, 0.0],
+                to: [16.0, 16.0, 16.0],
+                faces: HashMap::from([
+                    (Direction::Up,    ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::Up,    texture: "top".to_string() }),
+                    (Direction::Down,  ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::Down,  texture: "bottom".to_string() }),
+                    (Direction::North, ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::North, texture: "sides".to_string() }),
+                    (Direction::South, ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::South, texture: "sides".to_string() }),
+                    (Direction::East,  ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::East,  texture: "sides".to_string() }),
+                    (Direction::West,  ModelFace { uv: [0.0, 0.0, 16.0, 16.0], cullface: Direction::West,  texture: "sides".to_string() }),
+                ]),
+                textures: HashMap::from([
+                    ("top".to_string(), TextureId::GrassTop),
+                    ("sides".to_string(), TextureId::GrassSide),
+                    ("bottom".to_string(), TextureId::Dirt),
+                ])
+            },
+        ],
+    }
 }

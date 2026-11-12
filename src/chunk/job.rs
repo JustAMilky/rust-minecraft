@@ -12,7 +12,6 @@ pub enum JobType {
 
 pub struct ChunkJob {
     pub type_: JobType,
-    pub request_id: u64,
     pub position: IVec3,
     pub chunk: Chunk,
     pub neighbours: HashMap<Direction, Chunk>,
@@ -20,7 +19,6 @@ pub struct ChunkJob {
 
 pub struct ChunkJobResult {
     pub type_: JobType,
-    pub request_id: u64,
     pub position: IVec3,
     pub chunk: Chunk,
 }

@@ -139,7 +139,10 @@ impl ApplicationHandler<()> for App {
         self.input_man.process_event(&event);
 
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+                std::process::exit(0);
+            },
             WindowEvent::Resized(size) => {
                 renderer.resize(size.width, size.height);
                 if size.height > 0 {

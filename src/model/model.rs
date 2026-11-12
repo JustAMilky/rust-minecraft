@@ -131,10 +131,10 @@ impl ModelElement {
                 Direction::South => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [from[0], to[1],   to[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [to[0],   to[1],   to[2]], colour: WHITE, uv: uv[2] },
-                            Vertex { position: [to[0],   from[1], to[2]], colour: WHITE, uv: uv[3] },
-                            Vertex { position: [from[0], from[1], to[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [from[0], to[1],   to[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [to[0],   to[1],   to[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [to[0],   from[1], to[2]], colour: WHITE, uv: uv[2] },
+                            Vertex { position: [from[0], from[1], to[2]], colour: WHITE, uv: uv[1] },
                         ],
                         indicies: vec![0, 2, 1, 0, 3, 2],
                     }
@@ -143,10 +143,10 @@ impl ModelElement {
                 Direction::North => {
                     Mesh {
                         vertices: vec![
-                            Vertex { position: [from[0], to[1],   from[2]], colour: WHITE, uv: uv[1] },
-                            Vertex { position: [to[0],   to[1],   from[2]], colour: WHITE, uv: uv[2] },
-                            Vertex { position: [to[0],   from[1], from[2]], colour: WHITE, uv: uv[3] },
-                            Vertex { position: [from[0], from[1], from[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [from[0], to[1],   from[2]], colour: WHITE, uv: uv[0] },
+                            Vertex { position: [to[0],   to[1],   from[2]], colour: WHITE, uv: uv[3] },
+                            Vertex { position: [to[0],   from[1], from[2]], colour: WHITE, uv: uv[2] },
+                            Vertex { position: [from[0], from[1], from[2]], colour: WHITE, uv: uv[1] },
                         ],
                         indicies: vec![0, 1, 2, 0, 2, 3],
                     }

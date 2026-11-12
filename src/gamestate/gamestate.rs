@@ -20,7 +20,6 @@ use crate::utils::direction::{self, Direction};
 use crate::worldgen::worldgenerator::WorldGeneratorSettings;
 
 pub struct ChunkManagerRequest {
-    request_id: u64,
     lat_render_dist: u32,
     vert_render_dist: u32,
     cam_chunk_pos: IVec3,
@@ -28,7 +27,6 @@ pub struct ChunkManagerRequest {
 }
 
 pub struct ChunkManagerResult {
-    request_id: u64,
     position: IVec3,
     chunk: Option<Chunk>,
     to_load: Vec<IVec3>,
@@ -144,7 +142,6 @@ impl GameState {
                         Some(request) => {
                             // Reset the area loading
 
-                            active_request_id = request.request_id;
                             chunk_job_manager.set_request_id(active_request_id);
                             cam_chunk_pos = request.cam_chunk_pos;
 
@@ -178,7 +175,6 @@ impl GameState {
                             }
                             result_sender.send(
                                 ChunkManagerResult {
-                                    request_id: active_request_id,
                                     position: IVec3::new(0, 0, 0),
                                     chunk: None,
                                     to_load: Vec::new(),
@@ -211,7 +207,6 @@ impl GameState {
                                     chunk_job_manager.submit_job(
                                         ChunkJob {
                                             type_: JobType::GenTerrain,
-                                            request_id: active_request_id,
                                             position: p,
                                             chunk: Chunk::new(),
                                             neighbours: HashMap::new(),
@@ -230,17 +225,12 @@ impl GameState {
                             frontier = new_frontier;
 
                             if let Some(result) = chunk_job_manager.get_result() {
-                                if result.request_id != active_request_id {
-                                    continue;
-                                }
-
                                 match result.type_ {
                                     JobType::GenMesh => {
                                         match result_sender.send(
                                             ChunkManagerResult {
-                                                request_id: active_request_id,
                                                 position: result.position,
-                                                chunk: Some(result.chunk),
+                                                chunk: Some(result.chunk.clone()),
                                                 to_load,
                                                 to_unload: Vec::new(),
                                             }
@@ -249,6 +239,7 @@ impl GameState {
                                             _ => {},
                                         }
                                         to_load = Vec::new();
+                                        chunks.lock().insert(result.position, result.chunk);
                                     },
                                     JobType::GenTerrain => {
                                         let neighbours = Self::get_chunk_neighbours(Arc::clone(&chunks), result.position);
@@ -256,7 +247,6 @@ impl GameState {
                                         chunk_job_manager.submit_job(
                                             ChunkJob {
                                                 type_: JobType::GenMesh,
-                                                request_id: result.request_id,
                                                 position: result.position,
                                                 chunk: result.chunk.clone(),
                                                 neighbours,
@@ -268,7 +258,6 @@ impl GameState {
                                 if to_load.len() > 0 {
                                     result_sender.send(
                                         ChunkManagerResult {
-                                            request_id: active_request_id,
                                             position: IVec3::new(0, 0, 0),
                                             chunk: None,
                                             to_load,
@@ -349,7 +338,6 @@ impl GameState {
             self.latest_request_id += 1;
             self.request_sender.send(
                 ChunkManagerRequest {
-                    request_id: self.latest_request_id,
                     lat_render_dist: self.lateral_render_distance,
                     vert_render_dist: self.vertical_render_distance,
                     cam_chunk_pos,
@@ -363,18 +351,13 @@ impl GameState {
         for _ in 0..64 {
             match self.result_receiver.try_recv() {
                 Ok(result) => {
-                    if result.request_id != self.latest_request_id {
-                        continue;
-                    }
-
                     match result.chunk {
                         Some(chunk) => {
                             renderer.upload_chunk_mesh(
                                 result.position, 
                                 &chunk.mesh,
+                                true,
                             );
-
-                            self.chunks.lock().insert(result.position, chunk);
                             self.loaded.insert(result.position);
                         },
                         None => {},
@@ -382,7 +365,11 @@ impl GameState {
 
                     for p in result.to_load {
                         if !self.loaded.contains(&p) {
-                            renderer.upload_chunk_mesh(p, &self.chunks.lock().get(&p).expect("Chunk to load not found").mesh);
+                            renderer.upload_chunk_mesh(
+                                p, 
+                                &self.chunks.lock().get(&p).unwrap().mesh,
+                                true,
+                            );
                             self.loaded.insert(p);
                         }
                     }
@@ -390,7 +377,7 @@ impl GameState {
                     for p in result.to_unload {
                         if self.loaded.contains(&p) {
                             renderer.remove_chunk_mesh(p);
-                            self.loaded.remove(&p);
+                        self.loaded.remove(&p);
                         }
                     }
                 },

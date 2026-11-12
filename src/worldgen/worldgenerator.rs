@@ -45,10 +45,16 @@ impl WorldGenerator {
     }
 
     pub fn get_block(&mut self, block_world_pos: IVec3) -> BlockState {
-        if block_world_pos.y <= self.get_terrain_height(IVec2::new(block_world_pos.x, block_world_pos.z)) {
-            BlockState::Stone
-        } else {
+        let terrain_height = self.get_terrain_height(IVec2::new(block_world_pos.x, block_world_pos.z));
+
+        if block_world_pos.y > terrain_height {
             BlockState::Air
+        } else if block_world_pos.y > terrain_height - 1 {
+            BlockState::Grass
+        } else if block_world_pos.y > terrain_height - 5 {
+            BlockState::Dirt
+        } else {
+            BlockState::Stone
         }
     }
 }

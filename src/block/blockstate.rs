@@ -4,6 +4,8 @@ use crate::block::block::*;
 pub enum BlockState {
     Air,
     Stone,
+    Dirt,
+    Grass,
 }
 
 impl BlockState {
@@ -11,6 +13,8 @@ impl BlockState {
         match self {
             BlockState::Air => &Air,
             BlockState::Stone => &Stone,
+            BlockState::Dirt => &Dirt,
+            BlockState::Grass => &Grass,
         }
     }
 }

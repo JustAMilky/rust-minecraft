@@ -51,6 +51,7 @@ pub struct GpuChunkMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
+    pub active: bool,
 }
 
 pub struct Renderer {
@@ -352,7 +353,7 @@ impl Renderer {
         )
     }
 
-    pub fn upload_chunk_mesh(&mut self, position: IVec3, mesh: &Mesh) {
+    pub fn upload_chunk_mesh(&mut self, position: IVec3, mesh: &Mesh, active: bool) {
         if mesh.indicies.is_empty() {
             self.chunk_meshes.remove(&position);
             return;
@@ -378,6 +379,7 @@ impl Renderer {
             vertex_buffer,
             index_buffer,
             num_indices: mesh.indicies.len() as u32,
+            active,
         });
     }
 
@@ -499,7 +501,7 @@ impl Renderer {
             );
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
             for gpu_mesh in self.chunk_meshes.values() {
-                if gpu_mesh.num_indices == 0 {
+                if gpu_mesh.num_indices == 0 || !gpu_mesh.active {
                     continue;
                 }
 

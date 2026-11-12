@@ -42,16 +42,9 @@ impl ChunkJobManager {
                         Err(_) => break,
                     };
 
-                    if job.request_id != current_request_id.load(Ordering::Acquire) {
-                        continue;
-                    }
-
                     match job.type_ {
                         JobType::GenTerrain => {
-                            'terrain: for rel_x in 0..CHUNK_SIZE {
-                                if job.request_id != current_request_id.load(Ordering::Acquire) {
-                                    break 'terrain;
-                                }
+                            for rel_x in 0..CHUNK_SIZE {
                                 for rel_y in 0..CHUNK_SIZE {
                                     for rel_z in 0..CHUNK_SIZE {
                                         let rel_pos = IVec3::new(rel_x, rel_y, rel_z);
@@ -66,16 +59,11 @@ impl ChunkJobManager {
                                 }
                             }
 
-                            if job.request_id != current_request_id.load(Ordering::Acquire) {
-                                continue;
-                            }
-
                             job.chunk.generated = true;
                             job.chunk.needs_remesh = true;
 
                             match result_sender.send(ChunkJobResult {
                                 type_: job.type_,
-                                request_id: job.request_id,
                                 position: job.position,
                                 chunk: job.chunk,
                             }) {
@@ -91,16 +79,11 @@ impl ChunkJobManager {
                                 &atlas
                             );
 
-                            if job.request_id != current_request_id.load(Ordering::Acquire) {
-                                continue;
-                            }
-
                             job.chunk.meshed = true;
                             job.chunk.needs_remesh = false;
 
                             match result_sender.send(ChunkJobResult {
                                 type_: job.type_,
-                                request_id: job.request_id,
                                 position: job.position,
                                 chunk: job.chunk,
                             }) {

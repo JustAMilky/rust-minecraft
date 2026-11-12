@@ -22,3 +22,19 @@ impl Block for Stone {
     fn is_solid(&self) -> bool { true }
     fn get_model(&self, _: &BlockState) -> BlockModel { stone_model() }
 }
+
+pub struct Dirt;
+
+impl Block for Dirt {
+    fn name(&self) -> &str { "Dirt" }
+    fn is_solid(&self) -> bool { true }
+    fn get_model(&self, _: &BlockState) -> BlockModel { stone_model() }
+}
+
+pub struct Grass;
+
+impl Block for Grass {
+    fn name(&self) -> &str { "Grass Block" }
+    fn is_solid(&self) -> bool { true }
+    fn get_model(&self, _: &BlockState) -> BlockModel { grass_model() }
+}
