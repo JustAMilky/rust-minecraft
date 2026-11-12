@@ -146,7 +146,7 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
                         },
                     }
                 } else {
-                    BlockState::Air
+                    BlockState::Stone
                 };
 
                 if neighbour_block.get_block().is_solid() {

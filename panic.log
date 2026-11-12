@@ -1,23 +1,76 @@
-   Compiling minecraft v0.1.0 (/home/TheGirl790/Projects/rust-minecraft)
+   Compiling minecraft v0.1.0 (/home/arch/Projects/minecraft)
+error[E0425]: cannot find value `to_remesh` in this scope
+   --> src/gamestate/gamestate.rs:174:29
+    |
+174 | ...                   to_remesh = HashSet::new();
+    |                       ^^^^^^^^^
+    |
+help: you might have meant to introduce a new binding
+    |
+174 |                             let to_remesh = HashSet::new();
+    |                             +++
+
+error[E0425]: cannot find value `submitted` in this scope
+   --> src/gamestate/gamestate.rs:223:37
+    |
+223 | ...                   if !submitted.contains(&p) {
+    |                           ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `submitted` in this scope
+   --> src/gamestate/gamestate.rs:224:37
+    |
+224 | ...                   submitted.insert(p);
+    |                       ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `to_remesh` in this scope
+   --> src/gamestate/gamestate.rs:236:38
+    |
+236 | ...                   for p in to_remesh.clone() {
+    |                                ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `to_remesh` in this scope
+   --> src/gamestate/gamestate.rs:262:33
+    |
+262 | ...                   to_remesh.remove(&p);
+    |                       ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `submitted` in this scope
+   --> src/gamestate/gamestate.rs:273:41
+    |
+273 | ...                   submitted.remove(&result.position);
+    |                       ^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `to_remesh` in this scope
+   --> src/gamestate/gamestate.rs:275:41
+    |
+275 | ...                   to_remesh.insert(result.position);
+    |                       ^^^^^^^^^ not found in this scope
+
 warning: unused import: `RecvTimeoutError`
- --> src/gamestate/gamestate.rs:4:35
+ --> src/gamestate/gamestate.rs:6:35
   |
-4 | use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+6 | use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
   |                                   ^^^^^^^^^^^^^^^^
   |
   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
 warning: unused import: `self`
-  --> src/gamestate/gamestate.rs:14:20
+  --> src/gamestate/gamestate.rs:17:20
    |
-14 | use crate::chunk::{self, chunk::*};
+17 | use crate::chunk::{self, chunk::*};
    |                    ^^^^
 
 warning: unused import: `self`
-  --> src/gamestate/gamestate.rs:19:31
+  --> src/gamestate/gamestate.rs:22:31
    |
-19 | use crate::utils::direction::{self, Direction};
+22 | use crate::utils::direction::{self, Direction};
    |                               ^^^^
+
+warning: unused import: `winit::window::CursorIcon::Text`
+ --> src/model/modelregistry.rs:3:5
+  |
+3 | use winit::window::CursorIcon::Text;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: unused import: `std::time::Instant`
  --> src/chunk/jobmanager.rs:4:5
@@ -38,29 +91,29 @@ warning: unused imports: `hash::Hash` and `time::Duration`
   |                                 ^^^^^^^^^^  ^^^^^^^^^^^^^^
 
 warning: unused variable: `vertex_buffer`
-   --> src/renderer/renderer.rs:314:13
+   --> src/renderer/renderer.rs:315:13
     |
-314 |         let vertex_buffer = device.create_buffer_init(
+315 |         let vertex_buffer = device.create_buffer_init(
     |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_vertex_buffer`
     |
     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
 
 warning: unused variable: `index_buffer`
-   --> src/renderer/renderer.rs:321:13
+   --> src/renderer/renderer.rs:322:13
     |
-321 |         let index_buffer = device.create_buffer_init(
+322 |         let index_buffer = device.create_buffer_init(
     |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_index_buffer`
 
 warning: unused variable: `num_vertices`
-   --> src/renderer/renderer.rs:329:13
+   --> src/renderer/renderer.rs:330:13
     |
-329 |         let num_vertices = VERTICES.len() as u32;
+330 |         let num_vertices = VERTICES.len() as u32;
     |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_num_vertices`
 
 warning: unused variable: `num_indices`
-   --> src/renderer/renderer.rs:330:13
+   --> src/renderer/renderer.rs:331:13
     |
-330 |         let num_indices = INDICES.len() as u32;
+331 |         let num_indices = INDICES.len() as u32;
     |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_num_indices`
 
 warning: value assigned to `pixels` is never read
@@ -80,68 +133,6 @@ warning: unused variable: `chunks`
 24 |     pub fn new(num_threads: usize, world_generator_settings: WorldGeneratorSettings, chunks: Arc<Mutex<HashMap<IVec3, Chunk>>>, atlas: &TextureAtlas) -> Self {
    |                                                                                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_chunks`
 
-warning: fields `window` and `texture` are never read
-  --> src/renderer/renderer.rs:62:9
-   |
-56 | pub struct Renderer {
-   |            -------- fields in this struct
-...
-62 |     pub window: Arc<Window>,
-   |         ^^^^^^
-...
-70 |     pub texture: wgpu::Texture,
-   |         ^^^^^^^
-   |
-   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
-
-warning: methods `get_vertices`, `get_indicies`, and `scaled` are never used
-  --> src/renderer/mesh.rs:19:12
-   |
-11 | impl Mesh {
-   | --------- methods in this implementation
-...
-19 |     pub fn get_vertices(&self) -> &[Vertex] {
-   |            ^^^^^^^^^^^^
-...
-23 |     pub fn get_indicies(&self) -> &[u32] {
-   |            ^^^^^^^^^^^^
-...
-47 |     pub fn scaled(&self, scale: f32) -> Self {
-   |            ^^^^^^
-
-warning: method `name` is never used
- --> src/block/block.rs:5:8
-  |
-4 | pub trait Block {
-  |           ----- method in this trait
-5 |     fn name(&self) -> &str;
-  |        ^^^^
-
-warning: method `opposite` is never used
-  --> src/utils/direction.rs:38:12
-   |
-15 | impl Direction {
-   | -------------- method in this implementation
-...
-38 |     pub fn opposite(&self) -> Self {
-   |            ^^^^^^^^
-
-warning: field `settings` is never read
-  --> src/worldgen/worldgenerator.rs:14:5
-   |
-13 | pub struct WorldGenerator {
-   |            -------------- field in this struct
-14 |     settings: WorldGeneratorSettings,
-   |     ^^^^^^^^
-
-warning: variable `Result` should have a snake case name
-   --> src/chunk/jobmanager.rs:133:16
-    |
-133 |             Ok(Result) => Some(Result),
-    |                ^^^^^^ help: convert the identifier to snake case: `result`
-    |
-    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
-
-warning: `minecraft` (bin "minecraft") generated 18 warnings (run `cargo fix --bin "minecraft" -p minecraft` to apply 11 suggestions)
-    Finished `release` profile [optimized] target(s) in 2.88s
-     Running `target/release/minecraft`
+For more information about this error, try `rustc --explain E0425`.
+warning: `minecraft` (bin "minecraft") generated 13 warnings
+error: could not compile `minecraft` (bin "minecraft") due to 7 previous errors; 13 warnings emitted

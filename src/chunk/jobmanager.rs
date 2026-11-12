@@ -29,7 +29,6 @@ impl ChunkJobManager {
         for _ in 0..num_threads {
             let job_receiver = job_receiver.clone();
             let result_sender = result_sender.clone();
-            let current_request_id = Arc::clone(&request_id);
 
             let atlas = atlas.clone();
 

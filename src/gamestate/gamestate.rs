@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use std::backtrace::Backtrace;
+use std::collections::{HashSet, VecDeque};
+use std::ops::Index;
+use std::panic;
 use std::sync::Arc;
 use std::{f32::consts::PI, time::Instant};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
@@ -11,6 +14,7 @@ use std::collections::HashMap;
 
 use crate::camera::camera::Camera;
 use crate::app::input::InputManager;
+use crate::chunk::job::JobType::{GenMesh, GenTerrain};
 use crate::chunk::{self, chunk::*};
 use crate::chunk::job::*;
 use crate::chunk::jobmanager::ChunkJobManager;
@@ -18,6 +22,9 @@ use crate::renderer::renderer::Renderer;
 use crate::texture::texture::TextureAtlas;
 use crate::utils::direction::{self, Direction};
 use crate::worldgen::worldgenerator::WorldGeneratorSettings;
+
+const MAX_GEN_IN_FLIGHT: usize = 8;
+const MAX_MESH_IN_FLIGHT: usize = 64;
 
 pub struct ChunkManagerRequest {
     lat_render_dist: u32,
@@ -27,8 +34,6 @@ pub struct ChunkManagerRequest {
 }
 
 pub struct ChunkManagerResult {
-    position: IVec3,
-    chunk: Option<Chunk>,
     to_load: Vec<IVec3>,
     to_unload: Vec<IVec3>,
 }
@@ -67,7 +72,7 @@ impl GameState {
                 aspect_ratio: 16.0 / 9.0,
             },
             last_frame_tick: Instant::now(),
-            lateral_render_distance: 12,
+            lateral_render_distance: 8,
             vertical_render_distance: 8,
             chunks: Arc::new(Mutex::new(HashMap::new())),
             loaded: HashSet::new(),
@@ -113,9 +118,14 @@ impl GameState {
             let atlas = atlas.clone();
             let world_generator_settings = world_generator_settings.clone();
 
+            let default_hook = panic::take_hook();
+            panic::set_hook(Box::new(move |info| {
+                default_hook(info);
+                eprintln!("Backtrace:\n{}", Backtrace::force_capture());
+            }));
+
             std::thread::spawn(move || {
                 let mut active_request = false;
-                let mut active_request_id = 0;
 
                 let mut cam_chunk_pos: IVec3;
 
@@ -128,7 +138,12 @@ impl GameState {
                 let mut frontier: HashSet<IVec3> = HashSet::new();
 
                 let mut to_load: Vec<IVec3> = Vec::new();
-                let mut to_unload: Vec<IVec3>;
+                let mut to_unload: Vec<IVec3> = Vec::new();
+                let mut to_remesh: VecDeque<IVec3> = VecDeque::new();
+
+                let mut to_submit: VecDeque<IVec3> = VecDeque::new();
+                let mut submitted: HashSet<IVec3> = HashSet::new();
+                let mut mesh_submitted: HashSet<IVec3> = HashSet::new();
 
                 let chunk_job_manager = ChunkJobManager::new(
                     8,
@@ -142,7 +157,6 @@ impl GameState {
                         Some(request) => {
                             // Reset the area loading
 
-                            chunk_job_manager.set_request_id(active_request_id);
                             cam_chunk_pos = request.cam_chunk_pos;
 
                             min = IVec3::new(
@@ -165,6 +179,8 @@ impl GameState {
                             to_load = Vec::new();
                             to_unload = Vec::new();
 
+                            to_submit = VecDeque::new();
+
                             for p in &loaded {
                                 if p.x < min.x || p.x > max.x ||
                                    p.y < min.y || p.y > max.y ||
@@ -173,14 +189,6 @@ impl GameState {
                                     to_unload.push(*p);
                                 }
                             }
-                            result_sender.send(
-                                ChunkManagerResult {
-                                    position: IVec3::new(0, 0, 0),
-                                    chunk: None,
-                                    to_load: Vec::new(),
-                                    to_unload,
-                                }
-                            ).expect("Failed to send unload result");
 
                             active_request = true;
                         },
@@ -198,20 +206,13 @@ impl GameState {
                                     p.z < min.z || p.z > max.z
                                 { continue; }
 
-                                if chunks.lock().contains_key(&p) {
-                                    if !loaded.contains(&p) {
+                                if let Some(c) = chunks.lock().get(&p) {
+                                    if !loaded.contains(&p) && c.meshed {
                                         loaded.insert(p);
                                         to_load.push(p);
                                     }
                                 } else {
-                                    chunk_job_manager.submit_job(
-                                        ChunkJob {
-                                            type_: JobType::GenTerrain,
-                                            position: p,
-                                            chunk: Chunk::new(),
-                                            neighbours: HashMap::new(),
-                                        }
-                                    );
+                                    to_submit.push_back(p);
                                 }
 
                                 for d in Direction::all() {
@@ -224,48 +225,66 @@ impl GameState {
 
                             frontier = new_frontier;
 
-                            if let Some(result) = chunk_job_manager.get_result() {
-                                match result.type_ {
-                                    JobType::GenMesh => {
-                                        match result_sender.send(
-                                            ChunkManagerResult {
-                                                position: result.position,
-                                                chunk: Some(result.chunk.clone()),
-                                                to_load,
-                                                to_unload: Vec::new(),
-                                            }
-                                        ) {
-                                            Err(e) => eprintln!("Failed to send generation result: {}", e),
-                                            _ => {},
-                                        }
-                                        to_load = Vec::new();
-                                        chunks.lock().insert(result.position, result.chunk);
-                                    },
-                                    JobType::GenTerrain => {
-                                        let neighbours = Self::get_chunk_neighbours(Arc::clone(&chunks), result.position);
-
+                            if submitted.len() < MAX_GEN_IN_FLIGHT {
+                                if let Some(p) = to_submit.pop_front() {
+                                    if !submitted.contains(&p) {
+                                        submitted.insert(p);
                                         chunk_job_manager.submit_job(
                                             ChunkJob {
-                                                type_: JobType::GenMesh,
-                                                position: result.position,
-                                                chunk: result.chunk.clone(),
-                                                neighbours,
+                                                type_: GenTerrain,
+                                                position: p,
+                                                chunk: Chunk::new(),
+                                                neighbours: HashMap::new(),
                                             }
                                         );
                                     }
                                 }
-                            } else {
-                                if to_load.len() > 0 {
-                                    result_sender.send(
-                                        ChunkManagerResult {
-                                            position: IVec3::new(0, 0, 0),
-                                            chunk: None,
-                                            to_load,
-                                            to_unload: Vec::new(),
-                                        }
-                                    ).expect("Failed to send loading result");
-                                    to_load = Vec::new();
+                            }
+
+                            if mesh_submitted.len() < MAX_MESH_IN_FLIGHT {
+                                if let Some(p) = to_remesh.pop_front() {
+                                    let neighbours = Self::get_chunk_neighbours(Arc::clone(&chunks), p);
+                                    let chunk = chunks.lock().get(&p).unwrap().clone();
+
+                                    mesh_submitted.insert(p);
+                                    chunk_job_manager.submit_job(ChunkJob {
+                                        type_: GenMesh,
+                                        chunk,
+                                        position: p,
+                                        neighbours,
+                                    });
                                 }
+                            }
+
+                            if let Some(result) = chunk_job_manager.get_result() {
+                                match result.type_ {
+                                    JobType::GenMesh => {
+                                        mesh_submitted.remove(&result.position);
+                                        loaded.insert(result.position);
+                                        to_load.push(result.position);
+                                        chunks.lock().insert(result.position, result.chunk);
+                                    },
+                                    JobType::GenTerrain => {
+                                        submitted.remove(&result.position);
+                                        chunks.lock().insert(result.position, result.chunk);
+                                        to_remesh.push_back(result.position);
+                                    }
+                                }
+                            }
+
+                            if to_load.len() > 0 || to_unload.len() > 0 {
+                                match result_sender.send(
+                                    ChunkManagerResult {
+                                        to_load,
+                                        to_unload,
+                                    }
+                                ) {
+                                    Err(e) => eprintln!("Failed to send generation result: {}", e),
+                                    _ => {},
+                                }
+
+                                to_load = Vec::new();
+                                to_unload = Vec::new();
                             }
                         },
                     }
@@ -351,18 +370,6 @@ impl GameState {
         for _ in 0..64 {
             match self.result_receiver.try_recv() {
                 Ok(result) => {
-                    match result.chunk {
-                        Some(chunk) => {
-                            renderer.upload_chunk_mesh(
-                                result.position, 
-                                &chunk.mesh,
-                                true,
-                            );
-                            self.loaded.insert(result.position);
-                        },
-                        None => {},
-                    }
-
                     for p in result.to_load {
                         if !self.loaded.contains(&p) {
                             renderer.upload_chunk_mesh(
