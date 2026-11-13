@@ -23,8 +23,8 @@ use crate::texture::texture::TextureAtlas;
 use crate::utils::direction::{self, Direction};
 use crate::worldgen::worldgenerator::WorldGeneratorSettings;
 
-const MAX_GEN_IN_FLIGHT: usize = 8;
-const MAX_MESH_IN_FLIGHT: usize = 64;
+const MAX_GEN_IN_FLIGHT: usize = 16;
+const MAX_MESH_IN_FLIGHT: usize = 16;
 
 pub fn pos_in_range(pos: &IVec3, min: &IVec3, max: &IVec3) -> bool {
     pos.x >= min.x && pos.x <= max.x &&
@@ -78,8 +78,8 @@ impl GameState {
                 aspect_ratio: 16.0 / 9.0,
             },
             last_frame_tick: Instant::now(),
-            lateral_render_distance: 16,
-            vertical_render_distance: 16,
+            lateral_render_distance: 8,
+            vertical_render_distance: 8,
             chunks: Arc::new(Mutex::new(HashMap::new())),
             loaded: HashSet::new(),
             prev_cam_chunk_pos: IVec3::new(0, 0, 0),
@@ -133,6 +133,8 @@ impl GameState {
             std::thread::spawn(move || {
                 let mut active_request = false;
 
+                let mut active_request_id = 0;
+
                 let mut cam_chunk_pos: IVec3;
 
                 let mut min: IVec3 = IVec3::new(0, 0, 0);
@@ -162,6 +164,13 @@ impl GameState {
                     match request_receiver.try_iter().last() {
                         Some(request) => {
                             // Reset the area loading
+
+                            active_request_id += 1;
+
+                            chunk_job_manager.set_request_id(active_request_id);
+
+                            submitted = HashSet::new();
+                            mesh_submitted = HashSet::new();
 
                             cam_chunk_pos = request.cam_chunk_pos;
 
@@ -236,6 +245,7 @@ impl GameState {
                                     },
                                     JobType::GenTerrain => {
                                         submitted.remove(&result.position);
+                                        
                                         chunks.lock().insert(result.position, result.chunk);
                                         to_remesh.push_back(result.position);
 
@@ -274,6 +284,7 @@ impl GameState {
                                         submitted.insert(p);
                                         chunk_job_manager.submit_job(
                                             ChunkJob {
+                                                request_id: active_request_id,
                                                 type_: GenTerrain,
                                                 position: p,
                                                 chunk: Chunk::new(),
@@ -314,6 +325,7 @@ impl GameState {
 
                                         mesh_submitted.insert(p);
                                         chunk_job_manager.submit_job(ChunkJob {
+                                            request_id: active_request_id,
                                             type_: GenMesh,
                                             chunk,
                                             position: p,
@@ -333,7 +345,7 @@ impl GameState {
     }
 
     fn handle_movement(&mut self, input_man: &InputManager, dt: f32) {
-        let move_speed = 50.0;
+        let move_speed = 25.0;
         
         if input_man.is_pressed(KeyCode::ArrowLeft) {
             self.camera.yaw += PI / 2.0 * dt;
@@ -407,14 +419,12 @@ impl GameState {
             match self.result_receiver.try_recv() {
                 Ok(result) => {
                     for p in result.to_load {
-                        if !self.loaded.contains(&p) {
-                            renderer.upload_chunk_mesh(
-                                p, 
-                                &self.chunks.lock().get(&p).unwrap().mesh,
-                                true,
-                            );
-                            self.loaded.insert(p);
-                        }
+                        renderer.upload_chunk_mesh(
+                            p, 
+                            &self.chunks.lock().get(&p).unwrap().mesh,
+                            true,
+                        );
+                        self.loaded.insert(p);
                     }
 
                     for p in result.to_unload {

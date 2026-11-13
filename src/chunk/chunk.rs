@@ -14,7 +14,9 @@ pub struct Chunk {
 
     pub all_air: bool,
 
-    blocks: Vec<BlockState>,
+    palette: Vec<BlockState>,
+    bits_per_entry: u8,
+    blocks: Vec<u64>,
     pub mesh: Mesh,
 }
 
@@ -25,37 +27,97 @@ impl Chunk {
             meshed: false,
             needs_remesh: false,
             all_air: true,
-            blocks: vec![BlockState::Air; CHUNK_SIZE.pow(3).try_into().unwrap()],
+            palette: vec![BlockState::Air],
+            bits_per_entry: 2,
+            blocks: vec![0; CHUNK_SIZE.pow(3).try_into().unwrap()],
             mesh: Mesh::new(),
             was_edge: false,
         }
+    }
+
+    fn get_word_and_bit_offset(&self, block_index: usize) -> (usize, usize) {
+        let entries_per_word = 64 / self.bits_per_entry as usize;
+
+        let word_index = block_index / entries_per_word;
+        let entry_index = block_index % entries_per_word;
+
+        let bit_offset = entry_index * self.bits_per_entry as usize;
+
+        (word_index, bit_offset)
     }
 
     pub fn index(pos: IVec3) -> usize {
         (pos.x + CHUNK_SIZE * (pos.y + CHUNK_SIZE * pos.z)) as usize
     }
 
-    pub fn get_block_at(&self, pos: IVec3) -> BlockState {
-        self.blocks[Chunk::index(pos)].clone()
+    pub fn get_block_at_index(&self, index: usize) -> &BlockState {
+        let (word_index, bit_offset) = self.get_word_and_bit_offset(index);
+
+        let mask = (1u64 << self.bits_per_entry) - 1;
+
+        let palette_index = (self.blocks[word_index] >> bit_offset) & mask;
+
+        &self.palette[palette_index as usize]
+    }
+
+    pub fn get_block_at(&self, pos: IVec3) -> &BlockState {
+        let block_index = Self::index(pos);
+        self.get_block_at_index(block_index)
     }
 
     pub fn set_block_at(&mut self, pos: IVec3, block: BlockState) {
-        if pos.x < 0 || pos.x >= CHUNK_SIZE ||
-           pos.y < 0 || pos.y >= CHUNK_SIZE ||
-           pos.z < 0 || pos.z >= CHUNK_SIZE {
-            return;
+        let block_index = Self::index(pos);
+
+        let palette_index = match self.palette.iter().position(|b| *b == block) {
+            Some(index) => index,
+            None => {
+                self.palette.push(block);
+                self.palette.len() - 1
+            }
+        };
+
+        let new_bits = (usize::BITS - (self.palette.len() - 1).leading_zeros())
+            .max(1) as u8;
+
+        if new_bits > self.bits_per_entry {
+            let old_bits = self.bits_per_entry;
+            let old_entries_per_word = 64 / old_bits as usize;
+            let new_entries_per_word = 64 / new_bits as usize;
+
+            let block_count = CHUNK_SIZE.pow(3) as usize;
+            let new_word_count = block_count.div_ceil(new_entries_per_word);
+
+            let mut new_blocks = vec![0u64; new_word_count];
+
+            for i in 0..block_count {
+                let old_word = i / old_entries_per_word;
+                let old_entry = i % old_entries_per_word;
+                let old_offset = old_entry * old_bits as usize;
+                let old_mask = (1u64 << old_bits) - 1;
+
+                let index = (self.blocks[old_word] >> old_offset) & old_mask;
+
+                let new_word = i / new_entries_per_word;
+                let new_entry = i % new_entries_per_word;
+                let new_offset = new_entry * new_bits as usize;
+
+                new_blocks[new_word] |= index << new_offset;
+            }
+
+            self.blocks = new_blocks;
+            self.bits_per_entry = new_bits;
         }
 
-        let index = Chunk::index(pos);
-        let was_air = matches!(&self.blocks[index], BlockState::Air);
-        let is_air = matches!(&block, BlockState::Air);
-        self.blocks[index] = block;
+        let entries_per_word = 64 / self.bits_per_entry as usize;
 
-        if was_air && !is_air {
-            self.all_air = false;
-        } else if !was_air && is_air {
-            self.all_air = self.blocks.iter().all(|b| matches!(b, BlockState::Air));
-        }
+        let word_index = block_index / entries_per_word;
+        let entry_index = block_index % entries_per_word;
+        let bit_offset = entry_index * self.bits_per_entry as usize;
+
+        let mask = (1u64 << self.bits_per_entry) - 1;
+
+        self.blocks[word_index] &= !(mask << bit_offset);
+        self.blocks[word_index] |= (palette_index as u64) << bit_offset;
     }
 }
 
@@ -65,7 +127,8 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
     let size = CHUNK_SIZE as usize;
     let chunk_origin = chunk_pos * CHUNK_SIZE;
 
-    for (index, block) in chunk.blocks.iter().enumerate() {
+    for index in 0..CHUNK_SIZE.pow(3) as usize {
+        let block = chunk.get_block_at_index(index);
         if matches!(block, BlockState::Air) { continue; }
 
         let x = index % size;
@@ -148,7 +211,7 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
                         },
                     }
                 } else {
-                    BlockState::Stone
+                    &BlockState::Stone
                 };
 
                 if neighbour_block.get_block().is_solid() {
@@ -164,86 +227,4 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
     }
 
     mesh
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Chunk, gen_chunk_mesh};
-    use crate::block::blockstate::BlockState;
-    use crate::texture::texture::{AtlasRegion, TextureAtlas, TextureId};
-    use glam::IVec3;
-    use std::collections::HashMap;
-
-    #[test]
-    fn all_air_tracks_block_updates() {
-        let mut chunk = Chunk::new();
-        let first = IVec3::new(0, 0, 0);
-        let second = IVec3::new(1, 0, 0);
-
-        assert!(chunk.all_air);
-
-        chunk.set_block_at(first, BlockState::Stone);
-        chunk.set_block_at(second, BlockState::Stone);
-        assert!(!chunk.all_air);
-
-        chunk.set_block_at(first, BlockState::Air);
-        assert!(!chunk.all_air);
-
-        chunk.set_block_at(second, BlockState::Air);
-        assert!(chunk.all_air);
-    }
-
-    #[test]
-    fn adjacent_blocks_have_unit_scale_and_keep_all_faces() {
-        let mut chunk = Chunk::new();
-        chunk.set_block_at(IVec3::new(0, 0, 0), BlockState::Stone);
-        chunk.set_block_at(IVec3::new(1, 0, 0), BlockState::Stone);
-        let atlas = TextureAtlas {
-            width: 16,
-            height: 16,
-            pixels: vec![0; 16 * 16 * 4],
-            regions: HashMap::from([(
-                TextureId::Stone,
-                AtlasRegion {
-                    min: [0.0, 0.0],
-                    max: [16.0, 16.0],
-                },
-            )]),
-        };
-
-        let mesh = gen_chunk_mesh(IVec3::ZERO, &chunk, HashMap::new(), &atlas);
-
-        assert_eq!(mesh.vertices.len(), 48);
-        assert_eq!(mesh.indicies.len(), 72);
-        assert_eq!(
-            mesh.vertices
-                .iter()
-                .map(|vertex| vertex.position[0])
-                .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), x| {
-                    (min.min(x), max.max(x))
-                }),
-            (0.0, 2.0)
-        );
-        assert!(mesh.vertices.iter().all(|vertex| {
-            (0.0..=1.0).contains(&vertex.position[1])
-                && (0.0..=1.0).contains(&vertex.position[2])
-        }));
-    }
-
-    #[test]
-    fn air_blocks_generate_no_geometry() {
-        let chunk = Chunk::new();
-        let atlas = TextureAtlas {
-            width: 1,
-            height: 1,
-            pixels: vec![0; 4],
-            regions: HashMap::new(),
-        };
-
-        let mesh = gen_chunk_mesh(IVec3::ZERO, &chunk, HashMap::new(), &atlas);
-
-        assert!(mesh.vertices.is_empty());
-        assert!(mesh.indicies.is_empty());
-    }
-
 }

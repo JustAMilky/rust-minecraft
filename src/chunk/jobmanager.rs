@@ -31,7 +31,7 @@ impl ChunkJobManager {
             let result_sender = result_sender.clone();
 
             let atlas = atlas.clone();
-
+            let request_id = Arc::clone(&request_id);
             let world_generator_settings = world_generator_settings.clone();
 
             std::thread::spawn(move || {
@@ -43,6 +43,10 @@ impl ChunkJobManager {
                         Err(_) => break,
                     };
 
+                    if job.request_id != request_id.load(Ordering::Relaxed) {
+                        continue;
+                    }
+
                     match job.type_ {
                         JobType::GenTerrain => {
                             for rel_x in 0..CHUNK_SIZE {
@@ -51,7 +55,7 @@ impl ChunkJobManager {
                                         let rel_pos = IVec3::new(rel_x, rel_y, rel_z);
                                         let block_pos = rel_pos + job.position * CHUNK_SIZE;
 
-                                        let block = world_generator.get_block(block_pos);
+                                        let block = world_generator.get_block(block_pos, job.position);
 
                                         if !matches!(block, BlockState::Air) {
                                             job.chunk.set_block_at(rel_pos, block);
@@ -63,13 +67,15 @@ impl ChunkJobManager {
                             job.chunk.generated = true;
                             job.chunk.needs_remesh = true;
 
-                            match result_sender.send(ChunkJobResult {
-                                type_: job.type_,
-                                position: job.position,
-                                chunk: job.chunk,
-                            }) {
-                                Err(e) => eprintln!("Failed to send chunk job result: {}", e),
-                                _ => {},
+                            if job.request_id == request_id.load(Ordering::Relaxed) {
+                                match result_sender.send(ChunkJobResult {
+                                    type_: job.type_,
+                                    position: job.position,
+                                    chunk: job.chunk,
+                                }) {
+                                    Err(e) => eprintln!("Failed to send chunk job result: {}", e),
+                                    _ => {},
+                                }
                             }
                         },
                         JobType::GenMesh => {
@@ -83,13 +89,15 @@ impl ChunkJobManager {
                             job.chunk.meshed = true;
                             job.chunk.needs_remesh = false;
 
-                            match result_sender.send(ChunkJobResult {
-                                type_: job.type_,
-                                position: job.position,
-                                chunk: job.chunk,
-                            }) {
-                                Err(e) => eprintln!("Failed to send chunk job result: {}", e),
-                                _ => {},
+                            if job.request_id == request_id.load(Ordering::Relaxed) {
+                                match result_sender.send(ChunkJobResult {
+                                    type_: job.type_,
+                                    position: job.position,
+                                    chunk: job.chunk,
+                                }) {
+                                    Err(e) => eprintln!("Failed to send chunk job result: {}", e),
+                                    _ => {},
+                                }
                             }
                         },
                     }

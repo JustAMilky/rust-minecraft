@@ -11,6 +11,7 @@ pub enum JobType {
 }
 
 pub struct ChunkJob {
+    pub request_id: u64,
     pub type_: JobType,
     pub position: IVec3,
     pub chunk: Chunk,

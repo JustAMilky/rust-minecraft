@@ -1,6 +1,6 @@
 use crate::block::block::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BlockState {
     Air,
     Stone,
