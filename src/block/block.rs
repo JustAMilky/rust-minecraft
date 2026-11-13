@@ -28,7 +28,7 @@ pub struct Dirt;
 impl Block for Dirt {
     fn name(&self) -> &str { "Dirt" }
     fn is_solid(&self) -> bool { true }
-    fn get_model(&self, _: &BlockState) -> BlockModel { stone_model() }
+    fn get_model(&self, _: &BlockState) -> BlockModel { dirt_model() }
 }
 
 pub struct Grass;

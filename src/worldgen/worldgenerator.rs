@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use glam::{IVec2, IVec3};
-use noise::{NoiseFn, Perlin};
+use noise::{NoiseFn, Perlin, Worley, core::worley::ReturnType};
 
 use crate::block::blockstate::BlockState;
 
@@ -15,6 +15,7 @@ pub struct WorldGenerator {
     perlin: Perlin,
     cave_a: Perlin,
     cave_b: Perlin,
+    cave_c: Perlin,
     terrain_height_cache: HashMap<IVec2, i32>,
 }
 
@@ -25,6 +26,7 @@ impl WorldGenerator {
             perlin: Perlin::new(settings.seed),
             cave_a: Perlin::new(settings.seed.wrapping_add(1)),
             cave_b: Perlin::new(settings.seed.wrapping_add(2)),
+            cave_c: Perlin::new(settings.seed + 1),
             terrain_height_cache: HashMap::new(),
         }
     }
@@ -52,16 +54,16 @@ impl WorldGenerator {
         let terrain_height = self.get_terrain_height(IVec2::new(block_world_pos.x, block_world_pos.z));
 
         let cave_point = [
-            block_world_pos.x as f64 * 0.02,
-            block_world_pos.y as f64 * 0.02,
-            block_world_pos.z as f64 * 0.02,
+            block_world_pos.x as f64 * 0.01,
+            block_world_pos.y as f64 * 0.01,
+            block_world_pos.z as f64 * 0.01,
         ];
 
-        let in_cave = self.cave_a.get(cave_point).abs() < 0.05
-            && self.cave_b.get(cave_point).abs() < 0.05;
-
-        if in_cave
-        {
+        let in_cave =
+            self.cave_a.get(cave_point).abs() < 0.03 &&
+            self.cave_b.get(cave_point).abs() < 0.03;
+        
+        if in_cave {
             BlockState::Air
         } else if block_world_pos.y > terrain_height {
             BlockState::Air

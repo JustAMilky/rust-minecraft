@@ -3,13 +3,14 @@ use std::collections::{HashMap, HashSet};
 use glam::IVec3;
 use crate::{block::blockstate::BlockState, renderer::mesh::Mesh, texture::texture::TextureAtlas, utils::direction::Direction};
 
-pub const CHUNK_SIZE: i32 = 32;
+pub const CHUNK_SIZE: i32 = 16;
 
 #[derive(Clone)]
 pub struct Chunk {
     pub generated: bool,
     pub meshed: bool,
     pub needs_remesh: bool,
+    pub was_edge: bool,
 
     pub all_air: bool,
 
@@ -26,6 +27,7 @@ impl Chunk {
             all_air: true,
             blocks: vec![BlockState::Air; CHUNK_SIZE.pow(3).try_into().unwrap()],
             mesh: Mesh::new(),
+            was_edge: false,
         }
     }
 

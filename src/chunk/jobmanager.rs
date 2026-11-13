@@ -32,9 +32,11 @@ impl ChunkJobManager {
 
             let atlas = atlas.clone();
 
-            let mut world_generator = WorldGenerator::new(&world_generator_settings);
+            let world_generator_settings = world_generator_settings.clone();
 
             std::thread::spawn(move || {
+                let mut world_generator = WorldGenerator::new(&world_generator_settings);
+
                 loop {
                     let mut job: ChunkJob = match job_receiver.recv() {
                         Ok(job) => job,

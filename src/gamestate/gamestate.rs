@@ -26,6 +26,12 @@ use crate::worldgen::worldgenerator::WorldGeneratorSettings;
 const MAX_GEN_IN_FLIGHT: usize = 8;
 const MAX_MESH_IN_FLIGHT: usize = 64;
 
+pub fn pos_in_range(pos: &IVec3, min: &IVec3, max: &IVec3) -> bool {
+    pos.x >= min.x && pos.x <= max.x &&
+    pos.y >= min.y && pos.y <= max.y &&
+    pos.z >= min.z && pos.z <= max.z
+}
+
 pub struct ChunkManagerRequest {
     lat_render_dist: u32,
     vert_render_dist: u32,
@@ -72,8 +78,8 @@ impl GameState {
                 aspect_ratio: 16.0 / 9.0,
             },
             last_frame_tick: Instant::now(),
-            lateral_render_distance: 8,
-            vertical_render_distance: 8,
+            lateral_render_distance: 16,
+            vertical_render_distance: 16,
             chunks: Arc::new(Mutex::new(HashMap::new())),
             loaded: HashSet::new(),
             prev_cam_chunk_pos: IVec3::new(0, 0, 0),
@@ -182,10 +188,7 @@ impl GameState {
                             to_submit = VecDeque::new();
 
                             for p in &loaded {
-                                if p.x < min.x || p.x > max.x ||
-                                   p.y < min.y || p.y > max.y ||
-                                   p.z < min.z || p.z > max.z
-                                {
+                                if !pos_in_range(p, &min, &max) {
                                     to_unload.push(*p);
                                 }
                             }
@@ -200,19 +203,17 @@ impl GameState {
                             let mut new_frontier: HashSet<IVec3> = HashSet::new();
 
                             for p in frontier.drain() {
-                                if visited.contains(&p) ||
-                                    p.x < min.x || p.x > max.x ||
-                                    p.y < min.y || p.y > max.y ||
-                                    p.z < min.z || p.z > max.z
-                                { continue; }
+                                if visited.contains(&p) || !pos_in_range(&p, &min, &max) { continue; }
 
-                                if let Some(c) = chunks.lock().get(&p) {
-                                    if !loaded.contains(&p) && c.meshed {
-                                        loaded.insert(p);
-                                        to_load.push(p);
+                                if !loaded.contains(&p) && !to_unload.contains(&p) {
+                                    if let Some(c) = chunks.lock().get(&p) {
+                                        if !loaded.contains(&p) && c.meshed {
+                                            loaded.insert(p);
+                                            to_load.push(p);
+                                        }
+                                    } else {
+                                        to_submit.push_back(p);
                                     }
-                                } else {
-                                    to_submit.push_back(p);
                                 }
 
                                 for d in Direction::all() {
@@ -224,6 +225,48 @@ impl GameState {
                             }
 
                             frontier = new_frontier;
+
+                            if let Some(result) = chunk_job_manager.get_result() {
+                                match result.type_ {
+                                    JobType::GenMesh => {
+                                        mesh_submitted.remove(&result.position);
+                                        loaded.insert(result.position);
+                                        to_load.push(result.position);
+                                        chunks.lock().insert(result.position, result.chunk);
+                                    },
+                                    JobType::GenTerrain => {
+                                        submitted.remove(&result.position);
+                                        chunks.lock().insert(result.position, result.chunk);
+                                        to_remesh.push_back(result.position);
+
+                                        for d in Direction::all() {
+                                            let n = result.position + d.rel_vec();
+
+                                            if let Some(c) = chunks.lock().get_mut(&n) {
+                                                if c.was_edge {
+                                                    c.was_edge = false;
+                                                    to_remesh.push_back(n);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if to_load.len() > 0 || to_unload.len() > 0 {
+                                match result_sender.send(
+                                    ChunkManagerResult {
+                                        to_load,
+                                        to_unload,
+                                    }
+                                ) {
+                                    Err(e) => eprintln!("Failed to send generation result: {}", e),
+                                    _ => {},
+                                }
+
+                                to_load = Vec::new();
+                                to_unload = Vec::new();
+                            }
 
                             if submitted.len() < MAX_GEN_IN_FLIGHT {
                                 if let Some(p) = to_submit.pop_front() {
@@ -242,49 +285,42 @@ impl GameState {
                             }
 
                             if mesh_submitted.len() < MAX_MESH_IN_FLIGHT {
-                                if let Some(p) = to_remesh.pop_front() {
-                                    let neighbours = Self::get_chunk_neighbours(Arc::clone(&chunks), p);
-                                    let chunk = chunks.lock().get(&p).unwrap().clone();
+                                if let Some(&p) = to_remesh.front() {
+                                    let mut neighbours_ready = true;
+                                    let mut on_edge = false;
+                                    for d in Direction::all() {
+                                        let n = p + d.rel_vec();
+                                        let n_out_of_range = !pos_in_range(&n, &min, &max);
 
-                                    mesh_submitted.insert(p);
-                                    chunk_job_manager.submit_job(ChunkJob {
-                                        type_: GenMesh,
-                                        chunk,
-                                        position: p,
-                                        neighbours,
-                                    });
-                                }
-                            }
+                                        if n_out_of_range {
+                                            on_edge = true;
+                                        }
 
-                            if let Some(result) = chunk_job_manager.get_result() {
-                                match result.type_ {
-                                    JobType::GenMesh => {
-                                        mesh_submitted.remove(&result.position);
-                                        loaded.insert(result.position);
-                                        to_load.push(result.position);
-                                        chunks.lock().insert(result.position, result.chunk);
-                                    },
-                                    JobType::GenTerrain => {
-                                        submitted.remove(&result.position);
-                                        chunks.lock().insert(result.position, result.chunk);
-                                        to_remesh.push_back(result.position);
+                                        if let Some(c) = chunks.lock().get(&n) {
+                                            if !c.generated {
+                                                neighbours_ready = false;
+                                            }
+                                        } else if !n_out_of_range {
+                                            neighbours_ready = false;
+                                        }
+                                    }
+
+                                    if neighbours_ready {
+                                        to_remesh.pop_front();
+                                        let neighbours = Self::get_chunk_neighbours(Arc::clone(&chunks), p);
+                                        let mut chunk = chunks.lock().get(&p).unwrap().clone();
+
+                                        chunk.was_edge = on_edge;
+
+                                        mesh_submitted.insert(p);
+                                        chunk_job_manager.submit_job(ChunkJob {
+                                            type_: GenMesh,
+                                            chunk,
+                                            position: p,
+                                            neighbours,
+                                        });
                                     }
                                 }
-                            }
-
-                            if to_load.len() > 0 || to_unload.len() > 0 {
-                                match result_sender.send(
-                                    ChunkManagerResult {
-                                        to_load,
-                                        to_unload,
-                                    }
-                                ) {
-                                    Err(e) => eprintln!("Failed to send generation result: {}", e),
-                                    _ => {},
-                                }
-
-                                to_load = Vec::new();
-                                to_unload = Vec::new();
                             }
                         },
                     }
