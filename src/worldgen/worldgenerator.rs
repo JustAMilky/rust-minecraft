@@ -41,24 +41,28 @@ impl WorldGenerator {
         let y = block_pos.y as f64;
         let z = block_pos.z as f64;
 
-        let shape = self.perlin.get([
+        let shape_noise = self.perlin.get([
             x * 0.008,
             y * 0.008,
             z * 0.008,
         ]);
 
-        let mut weirdness = 0.0;
+        let weirdness_noise = self.perlin.get([
+            x * 0.03,
+            y * 0.03 + 128.0,
+            z * 0.03,
+        ]);
 
-        for i in 1..8 {
-            let octave = i as f64;
-            weirdness += self.perlin.get([
-                x * 0.025 / octave,
-                y * 0.025 / octave,
-                z * 0.025 / octave,
-            ]) / octave;
-        }
+        let ridges_noise = (1.0 - self.perlin.get([
+            x * 0.013,
+            y * 0.013 + 256.0,
+            z * 0.013,
+        ]).abs()).powf(0.8);
 
-        let surface = shape * 32.0 + weirdness * 32.0;
+        let surface =
+            shape_noise * 64.0
+            + weirdness_noise * 32.0
+            + ridges_noise * 64.0;
         let noise = y - surface;
 
         self.terrain_noise_cache.insert(block_pos, noise);
@@ -66,7 +70,12 @@ impl WorldGenerator {
         noise
     }
 
-    pub fn get_block(&mut self, block_world_pos: IVec3, chunk_pos: IVec3) -> BlockState {
+    pub fn clear_caches(&mut self) {
+        self.terrain_noise_cache.clear();
+        self.surface_block_cache.clear();
+    }
+
+    pub fn get_block(&mut self, block_world_pos: IVec3) -> BlockState {
         let cave_point = [
             block_world_pos.x as f64 * 0.01,
             block_world_pos.y as f64 * 0.01,

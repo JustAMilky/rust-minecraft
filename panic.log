@@ -1,69 +1,34 @@
-   Compiling minecraft v0.1.0 (/home/arch/Projects/minecraft)
-error[E0425]: cannot find value `to_remesh` in this scope
-   --> src/gamestate/gamestate.rs:174:29
-    |
-174 | ...                   to_remesh = HashSet::new();
-    |                       ^^^^^^^^^
-    |
-help: you might have meant to introduce a new binding
-    |
-174 |                             let to_remesh = HashSet::new();
-    |                             +++
-
-error[E0425]: cannot find value `submitted` in this scope
-   --> src/gamestate/gamestate.rs:223:37
-    |
-223 | ...                   if !submitted.contains(&p) {
-    |                           ^^^^^^^^^ not found in this scope
-
-error[E0425]: cannot find value `submitted` in this scope
-   --> src/gamestate/gamestate.rs:224:37
-    |
-224 | ...                   submitted.insert(p);
-    |                       ^^^^^^^^^ not found in this scope
-
-error[E0425]: cannot find value `to_remesh` in this scope
-   --> src/gamestate/gamestate.rs:236:38
-    |
-236 | ...                   for p in to_remesh.clone() {
-    |                                ^^^^^^^^^ not found in this scope
-
-error[E0425]: cannot find value `to_remesh` in this scope
-   --> src/gamestate/gamestate.rs:262:33
-    |
-262 | ...                   to_remesh.remove(&p);
-    |                       ^^^^^^^^^ not found in this scope
-
-error[E0425]: cannot find value `submitted` in this scope
-   --> src/gamestate/gamestate.rs:273:41
-    |
-273 | ...                   submitted.remove(&result.position);
-    |                       ^^^^^^^^^ not found in this scope
-
-error[E0425]: cannot find value `to_remesh` in this scope
-   --> src/gamestate/gamestate.rs:275:41
-    |
-275 | ...                   to_remesh.insert(result.position);
-    |                       ^^^^^^^^^ not found in this scope
-
-warning: unused import: `RecvTimeoutError`
- --> src/gamestate/gamestate.rs:6:35
+   Compiling minecraft v0.1.0 (/home/TheGirl790/Projects/rust-minecraft)
+warning: unused import: `Vec3`
+ --> src/renderer/renderer.rs:4:19
   |
-6 | use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
-  |                                   ^^^^^^^^^^^^^^^^
+4 | use glam::{IVec3, Vec3};
+  |                   ^^^^
   |
   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
+warning: unused import: `std::ops::Index`
+ --> src/gamestate/gamestate.rs:3:5
+  |
+3 | use std::ops::Index;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `RecvTimeoutError`
+ --> src/gamestate/gamestate.rs:7:35
+  |
+7 | use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
+  |                                   ^^^^^^^^^^^^^^^^
+
 warning: unused import: `self`
-  --> src/gamestate/gamestate.rs:17:20
+  --> src/gamestate/gamestate.rs:18:20
    |
-17 | use crate::chunk::{self, chunk::*};
+18 | use crate::chunk::{self, chunk::*};
    |                    ^^^^
 
 warning: unused import: `self`
-  --> src/gamestate/gamestate.rs:22:31
+  --> src/gamestate/gamestate.rs:23:31
    |
-22 | use crate::utils::direction::{self, Direction};
+23 | use crate::utils::direction::{self, Direction};
    |                               ^^^^
 
 warning: unused import: `winit::window::CursorIcon::Text`
@@ -72,23 +37,35 @@ warning: unused import: `winit::window::CursorIcon::Text`
 3 | use winit::window::CursorIcon::Text;
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: unused import: `std::time::Instant`
- --> src/chunk/jobmanager.rs:4:5
-  |
-4 | use std::time::Instant;
-  |     ^^^^^^^^^^^^^^^^^^
-
-warning: unused import: `crate::utils::direction::Direction`
-  --> src/chunk/jobmanager.rs:14:5
-   |
-14 | use crate::utils::direction::Direction;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 warning: unused imports: `hash::Hash` and `time::Duration`
  --> src/chunk/job.rs:1:33
   |
 1 | use std::{collections::HashMap, hash::Hash, time::Duration};
   |                                 ^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `IVec2`
+ --> src/worldgen/worldgenerator.rs:3:12
+  |
+3 | use glam::{IVec2, IVec3};
+  |            ^^^^^
+
+warning: unused imports: `Worley` and `core::worley::ReturnType`
+ --> src/worldgen/worldgenerator.rs:4:30
+  |
+4 | use noise::{NoiseFn, Perlin, Worley, core::worley::ReturnType};
+  |                              ^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `wgpu::naga::Block`
+ --> src/worldgen/worldgenerator.rs:5:5
+  |
+5 | use wgpu::naga::Block;
+  |     ^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `chunk::CHUNK_SIZE`, `self`, and `self`
+ --> src/worldgen/worldgenerator.rs:7:21
+  |
+7 | use crate::{block::{self, blockstate::BlockState}, chunk::{self, chunk::CHUNK_SIZE}};
+  |                     ^^^^                                   ^^^^  ^^^^^^^^^^^^^^^^^
 
 warning: unused variable: `vertex_buffer`
    --> src/renderer/renderer.rs:315:13
@@ -127,12 +104,109 @@ warning: value assigned to `pixels` is never read
    |
    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
 
-warning: unused variable: `chunks`
-  --> src/chunk/jobmanager.rs:24:86
+warning: unused variable: `job_type`
+  --> src/chunk/jobmanager.rs:53:25
    |
-24 |     pub fn new(num_threads: usize, world_generator_settings: WorldGeneratorSettings, chunks: Arc<Mutex<HashMap<IVec3, Chunk>>>, atlas: &TextureAtlas) -> Self {
-   |                                                                                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_chunks`
+53 |                     let job_type = "Terrain";
+   |                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_job_type`
 
-For more information about this error, try `rustc --explain E0425`.
-warning: `minecraft` (bin "minecraft") generated 13 warnings
-error: could not compile `minecraft` (bin "minecraft") due to 7 previous errors; 13 warnings emitted
+warning: unused variable: `started_at`
+  --> src/chunk/jobmanager.rs:54:25
+   |
+54 |                     let started_at = Instant::now();
+   |                         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_started_at`
+
+warning: unused variable: `job_type`
+   --> src/chunk/jobmanager.rs:122:25
+    |
+122 |                     let job_type = "Mesh";
+    |                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_job_type`
+
+warning: unused variable: `started_at`
+   --> src/chunk/jobmanager.rs:123:25
+    |
+123 |                     let started_at = Instant::now();
+    |                         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_started_at`
+
+warning: unused variable: `chunks`
+  --> src/chunk/jobmanager.rs:24:119
+   |
+24 |     pub fn new(num_terrain_threads: usize, num_mesh_threads: usize, world_generator_settings: WorldGeneratorSettings, chunks: Arc<Mutex<HashMap<IVec3, Chunk>>>, atlas: &TextureAtlas) -> Self {
+   |                                                                                                                       ^^^^^^ help: if this is intentional, prefix it with an underscore: `_chunks`
+
+warning: fields `window` and `texture` are never read
+  --> src/renderer/renderer.rs:63:9
+   |
+57 | pub struct Renderer {
+   |            -------- fields in this struct
+...
+63 |     pub window: Arc<Window>,
+   |         ^^^^^^
+...
+71 |     pub texture: wgpu::Texture,
+   |         ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `get_vertices`, `get_indicies`, and `scaled` are never used
+  --> src/renderer/mesh.rs:19:12
+   |
+11 | impl Mesh {
+   | --------- methods in this implementation
+...
+19 |     pub fn get_vertices(&self) -> &[Vertex] {
+   |            ^^^^^^^^^^^^
+...
+23 |     pub fn get_indicies(&self) -> &[u32] {
+   |            ^^^^^^^^^^^^
+...
+47 |     pub fn scaled(&self, scale: f32) -> Self {
+   |            ^^^^^^
+
+warning: method `name` is never used
+ --> src/block/block.rs:5:8
+  |
+4 | pub trait Block {
+  |           ----- method in this trait
+5 |     fn name(&self) -> &str;
+  |        ^^^^
+
+warning: method `opposite` is never used
+  --> src/utils/direction.rs:38:12
+   |
+15 | impl Direction {
+   | -------------- method in this implementation
+...
+38 |     pub fn opposite(&self) -> Self {
+   |            ^^^^^^^^
+
+warning: field `all_air` is never read
+  --> src/chunk/chunk.rs:15:9
+   |
+ 9 | pub struct Chunk {
+   |            ----- field in this struct
+...
+15 |     pub all_air: bool,
+   |         ^^^^^^^
+   |
+   = note: `Chunk` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `settings` is never read
+  --> src/worldgen/worldgenerator.rs:15:5
+   |
+14 | pub struct WorldGenerator {
+   |            -------------- field in this struct
+15 |     settings: WorldGeneratorSettings,
+   |     ^^^^^^^^
+
+warning: variable `Result` should have a snake case name
+   --> src/chunk/jobmanager.rs:183:16
+    |
+183 |             Ok(Result) => Some(Result),
+    |                ^^^^^^ help: convert the identifier to snake case: `result`
+    |
+    = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: `minecraft` (bin "minecraft") generated 28 warnings (run `cargo fix --bin "minecraft" -p minecraft` to apply 20 suggestions)
+    Finished `release` profile [optimized] target(s) in 2.89s
+     Running `target/release/minecraft`

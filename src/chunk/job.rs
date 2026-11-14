@@ -18,7 +18,13 @@ pub struct ChunkJob {
     pub neighbours: HashMap<Direction, Chunk>,
 }
 
-pub struct ChunkJobResult {
+pub enum ChunkJobResult {
+    Succeeded(JobResultData),
+    TerrainCanceled(IVec3),
+    MeshCanceled(IVec3),
+}
+
+pub struct JobResultData {
     pub type_: JobType,
     pub position: IVec3,
     pub chunk: Chunk,

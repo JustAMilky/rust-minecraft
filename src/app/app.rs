@@ -160,7 +160,17 @@ impl ApplicationHandler<()> for App {
 
                 state.frame_tick(&self.input_man, renderer);
 
-                match renderer.render(window, gui, &state.camera) {
+                match renderer.render(
+                    window,
+                    gui,
+                    &state.camera,
+                    
+                    &mut state.lateral_render_distance,
+                    &mut state.vertical_render_distance,
+                    &mut state.needs_chunk_load_refresh,
+
+                    &mut state.camera_fly_speed,
+                ) {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("{e}");

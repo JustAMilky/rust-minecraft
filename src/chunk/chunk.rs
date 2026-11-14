@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use glam::IVec3;
 use crate::{block::blockstate::BlockState, renderer::mesh::Mesh, texture::texture::TextureAtlas, utils::direction::Direction};
 
-pub const CHUNK_SIZE: i32 = 16;
+pub const CHUNK_SIZE: i32 = 32;
 
 #[derive(Clone)]
 pub struct Chunk {
@@ -22,18 +22,23 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn new() -> Self {
+        let bits_per_entry = 2;
+        let entries_per_word = 64 / bits_per_entry as usize;
+        let block_count = CHUNK_SIZE.pow(3) as usize;
+
         Self {
             generated: false,
             meshed: false,
             needs_remesh: false,
             all_air: true,
             palette: vec![BlockState::Air],
-            bits_per_entry: 2,
-            blocks: vec![0; CHUNK_SIZE.pow(3).try_into().unwrap()],
+            bits_per_entry,
+            blocks: vec![0; block_count.div_ceil(entries_per_word)],
             mesh: Mesh::new(),
             was_edge: false,
         }
     }
+
 
     fn get_word_and_bit_offset(&self, block_index: usize) -> (usize, usize) {
         let entries_per_word = 64 / self.bits_per_entry as usize;
@@ -227,4 +232,30 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
     }
 
     mesh
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chunk_storage_is_packed_and_preserves_blocks_across_words() {
+        let mut chunk = Chunk::new();
+        let last = CHUNK_SIZE - 1;
+
+        assert_eq!(chunk.blocks.len(), (CHUNK_SIZE.pow(3) as usize).div_ceil(32));
+
+        chunk.set_block_at(IVec3::new(0, 0, 0), BlockState::Stone);
+        chunk.set_block_at(IVec3::new(last, 0, 0), BlockState::Dirt);
+        chunk.set_block_at(IVec3::new(0, 1, 0), BlockState::Grass);
+        chunk.set_block_at(IVec3::new(last, last, last), BlockState::Stone);
+
+        assert_eq!(chunk.get_block_at_index(0), &BlockState::Stone);
+        assert_eq!(chunk.get_block_at_index(last as usize), &BlockState::Dirt);
+        assert_eq!(chunk.get_block_at_index(CHUNK_SIZE as usize), &BlockState::Grass);
+        assert_eq!(
+            chunk.get_block_at_index(CHUNK_SIZE.pow(3) as usize - 1),
+            &BlockState::Stone
+        );
+    }
 }

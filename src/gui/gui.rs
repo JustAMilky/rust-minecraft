@@ -52,16 +52,45 @@ impl Gui {
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         screen_size: [u32; 2],
+
+        lateral_render_distance: &mut u32,
+        vertical_render_distance: &mut u32,
+        needs_chunk_load_refresh: &mut bool,
+
+        camera_fly_speed: &mut f64,
     ) {
         let raw_input = self.state.take_egui_input(window);
 
         let mut full_output = self.context.run_ui(raw_input, |ctx| {
             egui::Window::new("Options")
-                .open(&mut true)
                 .default_pos([10.0, 10.0])
                 .resizable(false)
                 .show(ctx, |ui| {
-                    ui.label("Label!");
+                    let mut render_distance_changed = false;
+
+                    render_distance_changed |= ui
+                        .add(
+                            egui::Slider::new(lateral_render_distance, 1..=64)
+                                .text("Horizontal render distance (chunks)"),
+                        )
+                        .changed();
+                    render_distance_changed |= ui
+                        .add(
+                            egui::Slider::new(vertical_render_distance, 1..=64)
+                                .text("Vertical render distance (chunks)"),
+                        )
+                        .changed();
+
+                    if render_distance_changed {
+                        *needs_chunk_load_refresh = true;
+                    }
+
+                    ui
+                    .add(
+                        egui::Slider::new(camera_fly_speed, 1.0..=128.0)
+                            .text("Camera Fly Speed"),
+                    )
+                    .changed();
                 });
 
             egui::Area::new(egui::Id::unique("stats_overlay"))

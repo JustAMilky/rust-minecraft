@@ -23,8 +23,8 @@ use crate::texture::texture::TextureAtlas;
 use crate::utils::direction::{self, Direction};
 use crate::worldgen::worldgenerator::WorldGeneratorSettings;
 
-const MAX_GEN_IN_FLIGHT: usize = 16;
-const MAX_MESH_IN_FLIGHT: usize = 16;
+const MAX_GEN_IN_FLIGHT: usize = 4;
+const MAX_MESH_IN_FLIGHT: usize = 4;
 
 pub fn pos_in_range(pos: &IVec3, min: &IVec3, max: &IVec3) -> bool {
     pos.x >= min.x && pos.x <= max.x &&
@@ -62,6 +62,8 @@ pub struct GameState {
     latest_request_id: u64,
 
     pub world_generator_settings: WorldGeneratorSettings,
+
+    pub camera_fly_speed: f64,
 }
 
 impl GameState {
@@ -78,8 +80,8 @@ impl GameState {
                 aspect_ratio: 16.0 / 9.0,
             },
             last_frame_tick: Instant::now(),
-            lateral_render_distance: 8,
-            vertical_render_distance: 8,
+            lateral_render_distance: 12,
+            vertical_render_distance: 12,
             chunks: Arc::new(Mutex::new(HashMap::new())),
             loaded: HashSet::new(),
             prev_cam_chunk_pos: IVec3::new(0, 0, 0),
@@ -89,7 +91,8 @@ impl GameState {
             latest_request_id: 0,
             world_generator_settings: WorldGeneratorSettings {
                 seed: 0,
-            }
+            },
+            camera_fly_speed: 32.0,
         };
 
         Self::setup_chunk_manager_thread(request_receiver, result_sender, &new.world_generator_settings, Arc::clone(&new.chunks), atlas);
@@ -154,7 +157,8 @@ impl GameState {
                 let mut mesh_submitted: HashSet<IVec3> = HashSet::new();
 
                 let chunk_job_manager = ChunkJobManager::new(
-                    8,
+                    4,
+                    4,
                     world_generator_settings,
                     Arc::clone(&chunks),
                     &atlas
@@ -169,15 +173,12 @@ impl GameState {
 
                             chunk_job_manager.set_request_id(active_request_id);
 
-                            submitted = HashSet::new();
-                            mesh_submitted = HashSet::new();
-
                             cam_chunk_pos = request.cam_chunk_pos;
 
                             min = IVec3::new(
-                                cam_chunk_pos.x - request.lat_render_dist as i32,
-                                cam_chunk_pos.y - request.vert_render_dist as i32,
-                                cam_chunk_pos.z - request.lat_render_dist as i32,
+                                cam_chunk_pos.x - request.lat_render_dist as i32 - 1,
+                                cam_chunk_pos.y - request.vert_render_dist as i32 - 1,
+                                cam_chunk_pos.z - request.lat_render_dist as i32 - 1,
                             );
                             max = IVec3::new(
                                 cam_chunk_pos.x + request.lat_render_dist as i32,
@@ -220,6 +221,12 @@ impl GameState {
                                             loaded.insert(p);
                                             to_load.push(p);
                                         }
+
+                                        if c.generated && (!c.meshed || c.needs_remesh)
+                                            && !to_remesh.contains(&p)
+                                            && !mesh_submitted.contains(&p) {
+                                            to_remesh.push_back(p);
+                                        }
                                     } else {
                                         to_submit.push_back(p);
                                     }
@@ -236,30 +243,41 @@ impl GameState {
                             frontier = new_frontier;
 
                             if let Some(result) = chunk_job_manager.get_result() {
-                                match result.type_ {
-                                    JobType::GenMesh => {
-                                        mesh_submitted.remove(&result.position);
-                                        loaded.insert(result.position);
-                                        to_load.push(result.position);
-                                        chunks.lock().insert(result.position, result.chunk);
-                                    },
-                                    JobType::GenTerrain => {
-                                        submitted.remove(&result.position);
-                                        
-                                        chunks.lock().insert(result.position, result.chunk);
-                                        to_remesh.push_back(result.position);
+                                match result {
+                                    ChunkJobResult::Succeeded(data) => {
+                                        match data.type_ {
+                                            JobType::GenMesh => {
+                                                mesh_submitted.remove(&data.position);
+                                                loaded.insert(data.position);
+                                                to_load.push(data.position);
+                                                chunks.lock().insert(data.position, data.chunk);
+                                            },
+                                            JobType::GenTerrain => {
+                                                submitted.remove(&data.position);
+                                                
+                                                chunks.lock().insert(data.position, data.chunk);
+                                                to_remesh.push_back(data.position);
 
-                                        for d in Direction::all() {
-                                            let n = result.position + d.rel_vec();
+                                                for d in Direction::all() {
+                                                    let n = data.position + d.rel_vec();
 
-                                            if let Some(c) = chunks.lock().get_mut(&n) {
-                                                if c.was_edge {
-                                                    c.was_edge = false;
-                                                    to_remesh.push_back(n);
+                                                    if let Some(c) = chunks.lock().get_mut(&n) {
+                                                        if c.was_edge {
+                                                            c.was_edge = false;
+                                                            to_remesh.push_back(n);
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
+                                    },
+                                    ChunkJobResult::TerrainCanceled(position) => {
+                                        submitted.remove(&position);
+                                    },
+                                    ChunkJobResult::MeshCanceled(position) => {
+                                        mesh_submitted.remove(&position);
+                                    },
+
                                 }
                             }
 
@@ -296,42 +314,36 @@ impl GameState {
                             }
 
                             if mesh_submitted.len() < MAX_MESH_IN_FLIGHT {
-                                if let Some(&p) = to_remesh.front() {
-                                    let mut neighbours_ready = true;
-                                    let mut on_edge = false;
-                                    for d in Direction::all() {
+                                let ready_index = to_remesh.iter().position(|&p| {
+                                    Direction::all().into_iter().all(|d| {
                                         let n = p + d.rel_vec();
                                         let n_out_of_range = !pos_in_range(&n, &min, &max);
 
-                                        if n_out_of_range {
-                                            on_edge = true;
+                                        match chunks.lock().get(&n) {
+                                            Some(c) => c.generated,
+                                            None => n_out_of_range,
                                         }
+                                    })
+                                });
 
-                                        if let Some(c) = chunks.lock().get(&n) {
-                                            if !c.generated {
-                                                neighbours_ready = false;
-                                            }
-                                        } else if !n_out_of_range {
-                                            neighbours_ready = false;
-                                        }
-                                    }
+                                if let Some(index) = ready_index {
+                                    let p = to_remesh.remove(index).expect("ready queue index must exist");
+                                    let on_edge = Direction::all()
+                                        .into_iter()
+                                        .any(|d| !pos_in_range(&(p + d.rel_vec()), &min, &max));
 
-                                    if neighbours_ready {
-                                        to_remesh.pop_front();
-                                        let neighbours = Self::get_chunk_neighbours(Arc::clone(&chunks), p);
-                                        let mut chunk = chunks.lock().get(&p).unwrap().clone();
+                                    let neighbours = Self::get_chunk_neighbours(Arc::clone(&chunks), p);
+                                    let mut chunk = chunks.lock().get(&p).unwrap().clone();
+                                    chunk.was_edge = on_edge;
 
-                                        chunk.was_edge = on_edge;
-
-                                        mesh_submitted.insert(p);
-                                        chunk_job_manager.submit_job(ChunkJob {
-                                            request_id: active_request_id,
-                                            type_: GenMesh,
-                                            chunk,
-                                            position: p,
-                                            neighbours,
-                                        });
-                                    }
+                                    mesh_submitted.insert(p);
+                                    chunk_job_manager.submit_job(ChunkJob {
+                                        request_id: active_request_id,
+                                        type_: GenMesh,
+                                        chunk,
+                                        position: p,
+                                        neighbours,
+                                    });
                                 }
                             }
                         },
@@ -344,9 +356,7 @@ impl GameState {
 
     }
 
-    fn handle_movement(&mut self, input_man: &InputManager, dt: f32) {
-        let move_speed = 25.0;
-        
+    fn handle_movement(&mut self, input_man: &InputManager, dt: f32, fly_speed: f64) {
         if input_man.is_pressed(KeyCode::ArrowLeft) {
             self.camera.yaw += PI / 2.0 * dt;
         }
@@ -356,34 +366,42 @@ impl GameState {
 
         if input_man.is_pressed(KeyCode::ArrowDown) {
             self.camera.pitch -= PI / 2.0 * dt;
+
+            if self.camera.pitch <= -90_f32.to_radians() {
+                self.camera.pitch = -90_f32.to_radians();
+            }
         }
         if input_man.is_pressed(KeyCode::ArrowUp) {
             self.camera.pitch += PI / 2.0 * dt;
+
+            if self.camera.pitch >= 90_f32.to_radians() {
+                self.camera.pitch = 90_f32.to_radians();
+            }
         }
 
         if input_man.is_pressed(KeyCode::KeyW) {
-            self.camera.position.x += self.camera.yaw.sin() * move_speed * dt;
-            self.camera.position.z += self.camera.yaw.cos() * move_speed * dt;
+            self.camera.position.x += self.camera.yaw.sin() * fly_speed as f32 * dt;
+            self.camera.position.z += self.camera.yaw.cos() * fly_speed as f32 * dt;
         }
         if input_man.is_pressed(KeyCode::KeyS) {
-            self.camera.position.x -= self.camera.yaw.sin() * move_speed * dt;
-            self.camera.position.z -= self.camera.yaw.cos() * move_speed * dt;
+            self.camera.position.x -= self.camera.yaw.sin() * fly_speed as f32 * dt;
+            self.camera.position.z -= self.camera.yaw.cos() * fly_speed as f32 * dt;
         }
 
         if input_man.is_pressed(KeyCode::KeyA) {
-            self.camera.position.x += (self.camera.yaw + PI / 2.0).sin() * move_speed * dt;
-            self.camera.position.z += (self.camera.yaw + PI / 2.0).cos() * move_speed * dt;
+            self.camera.position.x += (self.camera.yaw + PI / 2.0).sin() * fly_speed as f32 * dt;
+            self.camera.position.z += (self.camera.yaw + PI / 2.0).cos() * fly_speed as f32 * dt;
         }
         if input_man.is_pressed(KeyCode::KeyD) {
-            self.camera.position.x -= (self.camera.yaw + PI / 2.0).sin() * move_speed * dt;
-            self.camera.position.z -= (self.camera.yaw + PI / 2.0).cos() * move_speed * dt;
+            self.camera.position.x -= (self.camera.yaw + PI / 2.0).sin() * fly_speed as f32 * dt;
+            self.camera.position.z -= (self.camera.yaw + PI / 2.0).cos() * fly_speed as f32 * dt;
         }
 
         if input_man.is_pressed(KeyCode::Space) {
-            self.camera.position.y += move_speed * dt;
+            self.camera.position.y += fly_speed as f32 * dt;
         }
         if input_man.is_pressed(KeyCode::ShiftLeft) {
-            self.camera.position.y -= move_speed * dt;
+            self.camera.position.y -= fly_speed as f32 * dt;
         }
     }
 
@@ -392,7 +410,7 @@ impl GameState {
         let dt = now.duration_since(self.last_frame_tick).as_secs_f32() / 1.0;
         self.last_frame_tick = now;
 
-        self.handle_movement(input_man, dt);
+        self.handle_movement(input_man, dt, self.camera_fly_speed);
 
         let cam_chunk_pos = (self.camera.position / Vec3::new(CHUNK_SIZE as f32, CHUNK_SIZE as f32, CHUNK_SIZE as f32)).as_ivec3();
 
@@ -415,7 +433,7 @@ impl GameState {
             self.needs_chunk_load_refresh = false;
         }
 
-        for _ in 0..64 {
+        for _ in 0..16 {
             match self.result_receiver.try_recv() {
                 Ok(result) => {
                     for p in result.to_load {

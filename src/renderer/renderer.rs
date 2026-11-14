@@ -403,6 +403,12 @@ impl Renderer {
         window: &Window,
         gui: &mut Gui,
         camera: &Camera,
+
+        lateral_render_distance: &mut u32,
+        vertical_render_distance: &mut u32,
+        needs_chunk_load_refresh: &mut bool,
+
+        camera_fly_speed: &mut f64,
     ) -> anyhow::Result<()> {
         if !self.is_surface_configured {
             return Ok(());
@@ -411,14 +417,14 @@ impl Renderer {
         let view = look_to_mat4(
             camera.position,
             camera.direction(),
-            Vec3::Y,
+            camera.up(),
         );
 
         let projection = perspective(
             camera.fov,
             camera.aspect_ratio,
-            0.1,
-            1000.0,
+            0.01,
+            10000.0,
         );
 
         let view_projection = projection * view;
@@ -527,6 +533,12 @@ impl Renderer {
             &mut encoder,
             &view,
             [self.config.width, self.config.height],
+
+            lateral_render_distance,
+            vertical_render_distance,
+            needs_chunk_load_refresh,
+
+            camera_fly_speed,
         );
 
         self.queue.submit([encoder.finish()]);

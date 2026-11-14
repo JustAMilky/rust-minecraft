@@ -22,4 +22,12 @@ impl Camera {
             self.yaw.cos() * self.pitch.cos(),
         ).normalize()
     }
+
+    pub fn up(&self) -> Vec3 {
+        Vec3::new(
+            -self.yaw.sin() * self.pitch.sin(),
+            self.pitch.cos(),
+            -self.yaw.cos() * self.pitch.sin(),
+        )
+    }
 }
