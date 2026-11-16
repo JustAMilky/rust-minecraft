@@ -160,7 +160,7 @@ impl GameState {
             let mut submitted: HashSet<IVec3> = HashSet::new();
             let mut mesh_submitted: HashSet<IVec3> = HashSet::new();
 
-            let chunk_job_manager = ChunkJobManager::new(4, 4, world_generator_settings, &atlas);
+            let chunk_job_manager = ChunkJobManager::new(8, 8, world_generator_settings, &atlas);
 
             loop {
                 match request_receiver.try_iter().last() {
