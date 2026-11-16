@@ -1,4 +1,6 @@
+use egui::mutex::Mutex;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::{
     blockdata::blockstate::BlockState, render::mesh::Mesh, texture::TextureAtlas,
@@ -19,6 +21,23 @@ pub struct Chunk {
     bits_per_entry: u8,
     blocks: Vec<u64>,
     pub mesh: Mesh,
+}
+
+pub fn get_chunk_neighbours(
+    chunks: Arc<Mutex<HashMap<IVec3, Chunk>>>,
+    chunk_pos: IVec3,
+) -> HashMap<Direction, Chunk> {
+    let mut neighbours = HashMap::new();
+
+    for d in Direction::all() {
+        let neighbour_pos = d.rel_vec() + chunk_pos;
+
+        if let Some(c) = chunks.lock().get(&neighbour_pos) {
+            neighbours.insert(d, c.clone());
+        }
+    }
+
+    neighbours
 }
 
 impl Chunk {
