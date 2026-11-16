@@ -10,7 +10,11 @@ pub struct Gui {
 }
 
 impl Gui {
-    pub fn new(window: &Window, device: &wgpu::Device, config: wgpu::SurfaceConfiguration) -> Result<Self, ()> {
+    pub fn new(
+        window: &Window,
+        device: &wgpu::Device,
+        config: wgpu::SurfaceConfiguration,
+    ) -> Result<Self, ()> {
         let context = egui::Context::default();
 
         let state = egui_winit::State::new(
@@ -22,21 +26,16 @@ impl Gui {
             None,
         );
 
-        let renderer = egui_wgpu::Renderer::new(
-            &device,
-            config.format,
-            egui_wgpu::RendererOptions::default(),
-        );
+        let renderer =
+            egui_wgpu::Renderer::new(device, config.format, egui_wgpu::RendererOptions::default());
 
-        Ok(
-            Self {
-                context,
-                state,
-                renderer,
-                fps: 0.0,
-                tps: 0.0,
-            }
-        )
+        Ok(Self {
+            context,
+            state,
+            renderer,
+            fps: 0.0,
+            tps: 0.0,
+        })
     }
 
     pub fn update(&mut self, fps: f32, tps: f32) {
@@ -44,6 +43,7 @@ impl Gui {
         self.tps = tps;
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
         window: &Window,
@@ -85,10 +85,8 @@ impl Gui {
                         *needs_chunk_load_refresh = true;
                     }
 
-                    ui
-                    .add(
-                        egui::Slider::new(camera_fly_speed, 1.0..=128.0)
-                            .text("Camera Fly Speed"),
+                    ui.add(
+                        egui::Slider::new(camera_fly_speed, 1.0..=128.0).text("Camera Fly Speed"),
                     )
                     .changed();
                 });
@@ -104,10 +102,7 @@ impl Gui {
                             let lines = [
                                 format!("FPS: {:.0}", self.fps),
                                 format!("TPS: {:.0}", self.tps),
-                                format!(
-                                    "Frame: {:.2} ms",
-                                    1000.0 / self.fps.max(0.001)
-                                ),
+                                format!("Frame: {:.2} ms", 1000.0 / self.fps.max(0.001)),
                             ];
 
                             for line in &lines {
@@ -117,15 +112,12 @@ impl Gui {
                 });
         });
 
-        self.state.handle_platform_output(
-            window,
-            full_output.platform_output,
-        );
+        self.state
+            .handle_platform_output(window, full_output.platform_output);
 
-        let paint_jobs = self.context.tessellate(
-            full_output.shapes,
-            full_output.pixels_per_point,
-        );
+        let paint_jobs = self
+            .context
+            .tessellate(full_output.shapes, full_output.pixels_per_point);
 
         let screen_descriptor = egui_wgpu::ScreenDescriptor {
             size_in_pixels: screen_size,
@@ -134,12 +126,7 @@ impl Gui {
 
         for (id, image_deltas) in full_output.textures_delta.set.drain() {
             for image_delta in &image_deltas {
-                self.renderer.update_texture(
-                    device,
-                    queue,
-                    id,
-                    image_delta,
-                );
+                self.renderer.update_texture(device, queue, id, image_delta);
             }
         }
 
@@ -147,35 +134,27 @@ impl Gui {
             self.renderer.free_texture(&id);
         }
 
-        let user_cmd_buffers = self.renderer.update_buffers(
-            device,
-            queue,
-            encoder,
-            &paint_jobs,
-            &screen_descriptor,
-        );
+        let user_cmd_buffers =
+            self.renderer
+                .update_buffers(device, queue, encoder, &paint_jobs, &screen_descriptor);
 
         {
-            let render_pass = encoder.begin_render_pass(
-                &wgpu::RenderPassDescriptor {
-                    label: Some("egui render pass"),
-                    color_attachments: &[Some(
-                        wgpu::RenderPassColorAttachment {
-                            view,
-                            depth_slice: None,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                        },
-                    )],
-                    depth_stencil_attachment: None,
-                    occlusion_query_set: None,
-                    timestamp_writes: None,
-                    multiview_mask: None,
-                },
-            );
+            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("egui render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
 
             self.renderer.render(
                 &mut render_pass.forget_lifetime(),

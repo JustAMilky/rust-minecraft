@@ -1,8 +1,8 @@
-use std::{collections::HashMap, hash::Hash, time::Duration};
+use std::collections::HashMap;
 
 use glam::IVec3;
 
-use crate::{chunk::chunk::*, utils::direction::Direction};
+use crate::{chunkdata::chunk::*, utils::direction::Direction};
 
 #[derive(Debug)]
 pub enum JobType {

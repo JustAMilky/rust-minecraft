@@ -1,14 +1,15 @@
-use winit::{
-    application::ApplicationHandler, event::*, event_loop::ActiveEventLoop, keyboard::PhysicalKey, window::Window
-};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use winit::{
+    application::ApplicationHandler, event::*, event_loop::ActiveEventLoop, keyboard::PhysicalKey,
+    window::Window,
+};
 
-use crate::gamestate::gamestate::GameState;
-use crate::renderer::renderer::Renderer;
-use crate::gui::gui::Gui;
-use crate::texture::texture::{Texture, TextureAtlas};
-use crate::app::input::InputManager;
+use crate::application::input::InputManager;
+use crate::gamestate::GameState;
+use crate::gui::Gui;
+use crate::render::renderer::Renderer;
+use crate::texture::{Texture, TextureAtlas};
 
 pub struct App {
     window: Option<Arc<Window>>,
@@ -56,30 +57,24 @@ impl ApplicationHandler<()> for App {
             .with_visible(true)
             .with_inner_size(winit::dpi::PhysicalSize::new(960, 540));
 
-        let window = Arc::new(
-            event_loop.create_window(window_attributes).unwrap()
-        );
+        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
-        let state = pollster::block_on(
-            GameState::new(&self.texture_atlas)
-        ).unwrap();
+        let state = pollster::block_on(GameState::new(&self.texture_atlas)).unwrap();
 
         self.state = Some(state);
 
-        let renderer = pollster::block_on(
-            Renderer::new(window.clone(), Texture {
+        let renderer = pollster::block_on(Renderer::new(
+            window.clone(),
+            Texture {
                 width: self.texture_atlas.width,
                 height: self.texture_atlas.height,
                 pixels: self.texture_atlas.pixels.clone(),
-            }
-        )
-        ).expect("Failed to create renderer");
+            },
+        ))
+        .expect("Failed to create renderer");
 
-        let gui = Gui::new(
-            &window,
-            &renderer.device,
-            renderer.config.clone(),
-        ).expect("Failed to create GUI");
+        let gui = Gui::new(&window, &renderer.device, renderer.config.clone())
+            .expect("Failed to create GUI");
 
         self.renderer = Some(renderer);
         self.gui = Some(gui);
@@ -142,7 +137,7 @@ impl ApplicationHandler<()> for App {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
                 std::process::exit(0);
-            },
+            }
             WindowEvent::Resized(size) => {
                 renderer.resize(size.width, size.height);
                 if size.height > 0 {
@@ -164,11 +159,9 @@ impl ApplicationHandler<()> for App {
                     window,
                     gui,
                     &state.camera,
-                    
                     &mut state.lateral_render_distance,
                     &mut state.vertical_render_distance,
                     &mut state.needs_chunk_load_refresh,
-
                     &mut state.camera_fly_speed,
                 ) {
                     Ok(_) => {}
@@ -177,7 +170,7 @@ impl ApplicationHandler<()> for App {
                         event_loop.exit();
                     }
                 }
-            },
+            }
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {

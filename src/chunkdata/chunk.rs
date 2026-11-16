@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::{
+    blockdata::blockstate::BlockState, render::mesh::Mesh, texture::TextureAtlas,
+    utils::direction::Direction,
+};
 use glam::IVec3;
-use crate::{block::blockstate::BlockState, renderer::mesh::Mesh, texture::texture::TextureAtlas, utils::direction::Direction};
 
 pub const CHUNK_SIZE: i32 = 32;
 
@@ -11,8 +14,6 @@ pub struct Chunk {
     pub meshed: bool,
     pub needs_remesh: bool,
     pub was_edge: bool,
-
-    pub all_air: bool,
 
     palette: Vec<BlockState>,
     bits_per_entry: u8,
@@ -30,7 +31,6 @@ impl Chunk {
             generated: false,
             meshed: false,
             needs_remesh: false,
-            all_air: true,
             palette: vec![BlockState::Air],
             bits_per_entry,
             blocks: vec![0; block_count.div_ceil(entries_per_word)],
@@ -38,7 +38,6 @@ impl Chunk {
             was_edge: false,
         }
     }
-
 
     fn get_word_and_bit_offset(&self, block_index: usize) -> (usize, usize) {
         let entries_per_word = 64 / self.bits_per_entry as usize;
@@ -81,8 +80,7 @@ impl Chunk {
             }
         };
 
-        let new_bits = (usize::BITS - (self.palette.len() - 1).leading_zeros())
-            .max(1) as u8;
+        let new_bits = (usize::BITS - (self.palette.len() - 1).leading_zeros()).max(1) as u8;
 
         if new_bits > self.bits_per_entry {
             let old_bits = self.bits_per_entry;
@@ -126,7 +124,12 @@ impl Chunk {
     }
 }
 
-pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direction, Chunk>, atlas: &TextureAtlas) -> Mesh {
+pub fn gen_chunk_mesh(
+    chunk_pos: IVec3,
+    chunk: &Chunk,
+    neighbours: HashMap<Direction, Chunk>,
+    atlas: &TextureAtlas,
+) -> Mesh {
     let mut mesh = Mesh::new();
 
     let size = CHUNK_SIZE as usize;
@@ -134,26 +137,28 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
 
     for index in 0..CHUNK_SIZE.pow(3) as usize {
         let block = chunk.get_block_at_index(index);
-        if matches!(block, BlockState::Air) { continue; }
+        if matches!(block, BlockState::Air) {
+            continue;
+        }
 
         let x = index % size;
         let y = (index / size) % size;
         let z = index / (size * size);
 
-        let local_pos = IVec3::new(
-            x as i32,
-            y as i32,
-            z as i32,
-        );
+        let local_pos = IVec3::new(x as i32, y as i32, z as i32);
 
         let mut cull_faces: HashSet<Direction> = HashSet::new();
 
         for d in Direction::all() {
             let neighbour = local_pos + d.rel_vec();
 
-            if neighbour.x >= 0 && neighbour.x < CHUNK_SIZE &&
-               neighbour.y >= 0 && neighbour.y < CHUNK_SIZE &&
-               neighbour.z >= 0 && neighbour.z < CHUNK_SIZE {
+            if neighbour.x >= 0
+                && neighbour.x < CHUNK_SIZE
+                && neighbour.y >= 0
+                && neighbour.y < CHUNK_SIZE
+                && neighbour.z >= 0
+                && neighbour.z < CHUNK_SIZE
+            {
                 if chunk.get_block_at(neighbour).get_block().is_solid() {
                     cull_faces.insert(d);
                 }
@@ -161,59 +166,29 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
                 let neighbour_block = if let Some(neighbour_chunk) = neighbours.get(&d) {
                     match d {
                         Direction::Up => {
-                            neighbour_chunk.get_block_at(
-                                IVec3::new(
-                                    local_pos.x,
-                                    0,
-                                    local_pos.z,
-                                )
-                            )
-                        },
-                        Direction::Down => {
-                            neighbour_chunk.get_block_at(
-                                IVec3::new(
-                                    local_pos.x,
-                                    CHUNK_SIZE - 1,
-                                    local_pos.z,
-                                )
-                            )
-                        },
-                        Direction::North => {
-                            neighbour_chunk.get_block_at(
-                                IVec3::new(
-                                    local_pos.x,
-                                    local_pos.y,
-                                    CHUNK_SIZE - 1,
-                                )
-                            )
-                        },
+                            neighbour_chunk.get_block_at(IVec3::new(local_pos.x, 0, local_pos.z))
+                        }
+                        Direction::Down => neighbour_chunk.get_block_at(IVec3::new(
+                            local_pos.x,
+                            CHUNK_SIZE - 1,
+                            local_pos.z,
+                        )),
+                        Direction::North => neighbour_chunk.get_block_at(IVec3::new(
+                            local_pos.x,
+                            local_pos.y,
+                            CHUNK_SIZE - 1,
+                        )),
                         Direction::South => {
-                            neighbour_chunk.get_block_at(
-                                IVec3::new(
-                                    local_pos.x,
-                                    local_pos.y,
-                                    0,
-                                )
-                            )
-                        },
+                            neighbour_chunk.get_block_at(IVec3::new(local_pos.x, local_pos.y, 0))
+                        }
                         Direction::East => {
-                            neighbour_chunk.get_block_at(
-                                IVec3::new(
-                                    0,
-                                    local_pos.y,
-                                    local_pos.z,
-                                )
-                            )
-                        },
-                        Direction::West => {
-                            neighbour_chunk.get_block_at(
-                                IVec3::new(
-                                    CHUNK_SIZE - 1,
-                                    local_pos.y,
-                                    local_pos.z,
-                                )
-                            )
-                        },
+                            neighbour_chunk.get_block_at(IVec3::new(0, local_pos.y, local_pos.z))
+                        }
+                        Direction::West => neighbour_chunk.get_block_at(IVec3::new(
+                            CHUNK_SIZE - 1,
+                            local_pos.y,
+                            local_pos.z,
+                        )),
                     }
                 } else {
                     &BlockState::Stone
@@ -225,10 +200,17 @@ pub fn gen_chunk_mesh(chunk_pos: IVec3, chunk: &Chunk, neighbours: HashMap<Direc
             }
         }
 
-        if cull_faces.len() == 6 { continue; }
+        if cull_faces.len() == 6 {
+            continue;
+        }
 
         let model = block.get_block().get_model(block);
-        model.add_own_mesh_to_mesh(&mut mesh, cull_faces, (chunk_origin + local_pos).as_vec3(), atlas);
+        model.add_own_mesh_to_mesh(
+            &mut mesh,
+            cull_faces,
+            (chunk_origin + local_pos).as_vec3(),
+            atlas,
+        );
     }
 
     mesh
@@ -243,7 +225,10 @@ mod tests {
         let mut chunk = Chunk::new();
         let last = CHUNK_SIZE - 1;
 
-        assert_eq!(chunk.blocks.len(), (CHUNK_SIZE.pow(3) as usize).div_ceil(32));
+        assert_eq!(
+            chunk.blocks.len(),
+            (CHUNK_SIZE.pow(3) as usize).div_ceil(32)
+        );
 
         chunk.set_block_at(IVec3::new(0, 0, 0), BlockState::Stone);
         chunk.set_block_at(IVec3::new(last, 0, 0), BlockState::Dirt);
@@ -252,7 +237,10 @@ mod tests {
 
         assert_eq!(chunk.get_block_at_index(0), &BlockState::Stone);
         assert_eq!(chunk.get_block_at_index(last as usize), &BlockState::Dirt);
-        assert_eq!(chunk.get_block_at_index(CHUNK_SIZE as usize), &BlockState::Grass);
+        assert_eq!(
+            chunk.get_block_at_index(CHUNK_SIZE as usize),
+            &BlockState::Grass
+        );
         assert_eq!(
             chunk.get_block_at_index(CHUNK_SIZE.pow(3) as usize - 1),
             &BlockState::Stone

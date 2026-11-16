@@ -31,29 +31,16 @@ impl TextureRegistry {
 
             let path = Path::new(path);
 
-            let mut pixels = Vec::new();
-            let width;
-            let height;
-
-            let image = image::open(path);
-            match image {
-                Ok(i) => {
-                    pixels = i.clone().into_rgba8().into_raw();
-                    width = i.width();
-                    height = i.height();
-                },
-                Err(_) => {
-                    pixels = vec![
-                        255, 0, 255, 255,
-                        0, 0, 0, 255,
-                        0, 0, 0, 255,
-                        255, 0, 255, 255,
-                    ];
-                    width = 2;
-                    height = 2;
-                }
-            }
-            
+            let (pixels, width, height): (Vec<u8>, u32, u32) = match image::open(path) {
+                Ok(i) => (i.clone().into_rgba8().into_raw(), i.width(), i.height()),
+                Err(_) => (
+                    vec![
+                        255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255,
+                    ],
+                    2,
+                    2,
+                ),
+            };
 
             new.textures.insert(
                 id,
@@ -61,7 +48,7 @@ impl TextureRegistry {
                     width,
                     height,
                     pixels: pixels.clone(),
-                }
+                },
             );
         }
 
@@ -92,7 +79,7 @@ impl TextureAtlas {
             regions: HashMap::new(),
         };
 
-        if textures.len() == 0 {
+        if textures.is_empty() {
             return Ok(new);
         }
 
@@ -109,10 +96,7 @@ impl TextureAtlas {
 
         new.pixels = vec![0; (new.width * new.height * 4) as usize];
 
-        for i in 0..texture_count {
-            let t = &textures[i].1;
-            let id = &textures[i].0;
-
+        for (i, (id, t)) in textures.iter().enumerate() {
             if t.width != texture_width || t.height != texture_height {
                 anyhow::bail!("Could not generate texture atlas: all texture sizes not identical");
             }
@@ -120,10 +104,7 @@ impl TextureAtlas {
             let row = i as u32 % grid_size;
             let column = i as u32 / grid_size;
 
-            let min = [
-                column * texture_width,
-                row * texture_height,
-            ];
+            let min = [column * texture_width, row * texture_height];
             let max = [min[0] + texture_width, min[1] + texture_height];
 
             let mut pxl_idx: usize = 0;
@@ -132,7 +113,7 @@ impl TextureAtlas {
                 for y in min[1]..max[1] {
                     let write_idx = ((y * new.width + x) * 4) as usize;
 
-                    new.pixels[write_idx + 0] = t.pixels[pxl_idx + 0];
+                    new.pixels[write_idx] = t.pixels[pxl_idx];
                     new.pixels[write_idx + 1] = t.pixels[pxl_idx + 1];
                     new.pixels[write_idx + 2] = t.pixels[pxl_idx + 2];
                     new.pixels[write_idx + 3] = t.pixels[pxl_idx + 3];
@@ -141,10 +122,13 @@ impl TextureAtlas {
                 }
             }
 
-            new.regions.insert(*id, AtlasRegion {
-                min: [min[0] as f32, min[1] as f32],
-                max: [max[0] as f32, max[1] as f32],
-            });
+            new.regions.insert(
+                *id,
+                AtlasRegion {
+                    min: [min[0] as f32, min[1] as f32],
+                    max: [max[0] as f32, max[1] as f32],
+                },
+            );
         }
 
         Ok(new)

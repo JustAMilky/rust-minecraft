@@ -1,4 +1,4 @@
-use crate::block::block::*;
+use crate::blockdata::block::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BlockState {
