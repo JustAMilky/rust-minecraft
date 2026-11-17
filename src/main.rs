@@ -30,6 +30,9 @@ fn main() -> anyhow::Result<()> {
             "assets/textures/block/grass_block_top.png",
         ),
         (TextureId::OakPlanks, "assets/textures/block/oak_planks.png"),
+        (TextureId::Leaves, "assets/textures/block/leaves.png"),
+        (TextureId::LogTop, "assets/textures/block/log_top.png"),
+        (TextureId::LogSide, "assets/textures/block/log_side.png"),
     ];
 
     let texture_registry = TextureRegistry::from_paths(texture_paths);

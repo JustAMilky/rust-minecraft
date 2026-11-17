@@ -140,3 +140,19 @@ pub fn grass_model() -> BlockModel {
         }],
     }
 }
+
+pub fn leaves_model() -> BlockModel {
+    let mut model = stone_model();
+    model.elements[0].textures = HashMap::from([("all".to_string(), TextureId::Leaves)]);
+    model
+}
+
+pub fn log_model() -> BlockModel {
+    let mut model = grass_model();
+    model.elements[0].textures = HashMap::from([
+        ("top".to_string(), TextureId::LogTop),
+        ("sides".to_string(), TextureId::LogSide),
+        ("bottom".to_string(), TextureId::LogTop),
+    ]);
+    model
+}

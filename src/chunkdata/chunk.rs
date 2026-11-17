@@ -2,13 +2,14 @@ use egui::mutex::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use crate::worldgen::structure::structure::StructureStart;
 use crate::{
     blockdata::blockstate::BlockState, render::mesh::Mesh, texture::TextureAtlas,
     utils::direction::Direction,
 };
 use glam::IVec3;
 
-pub const CHUNK_SIZE: i32 = 32;
+pub const CHUNK_SIZE: i32 = 16;
 
 #[derive(Clone)]
 pub struct Chunk {
@@ -21,6 +22,8 @@ pub struct Chunk {
     bits_per_entry: u8,
     blocks: Vec<u64>,
     pub mesh: Mesh,
+
+    pub structure_starts: Vec<StructureStart>,
 }
 
 pub fn get_chunk_neighbours(
@@ -55,6 +58,7 @@ impl Chunk {
             blocks: vec![0; block_count.div_ceil(entries_per_word)],
             mesh: Mesh::new(),
             was_edge: false,
+            structure_starts: Vec::new(),
         }
     }
 
