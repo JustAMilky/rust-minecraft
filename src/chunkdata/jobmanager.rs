@@ -48,24 +48,7 @@ impl ChunkJobManager {
                     }
 
                     world_generator.clear_caches();
-
-                    for rel_x in 0..CHUNK_SIZE {
-                        if job.request_id != request_id.load(Ordering::Relaxed) {
-                            break;
-                        }
-                        for rel_y in 0..CHUNK_SIZE {
-                            for rel_z in 0..CHUNK_SIZE {
-                                let rel_pos = IVec3::new(rel_x, rel_y, rel_z);
-                                let block_pos = rel_pos + job.position * CHUNK_SIZE;
-
-                                let block = world_generator.get_block(block_pos);
-
-                                if !matches!(block, BlockState::Air) {
-                                    job.chunk.set_block_at(rel_pos, block);
-                                }
-                            }
-                        }
-                    }
+                    world_generator.generate_chunk(&mut job.chunk, &job.position);
 
                     job.chunk.generated = true;
                     job.chunk.needs_remesh = true;

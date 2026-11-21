@@ -1,3 +1,5 @@
+use glam::IVec3;
+
 use crate::blockdata::blockstate::BlockState;
 use crate::modeldata::{model::*, modelregistry::*};
 
@@ -6,6 +8,8 @@ pub trait Block {
     fn name(&self) -> &str;
     fn is_solid(&self) -> bool;
     fn get_model(&self, state: &BlockState) -> BlockModel;
+    fn on_place(&self, pos: IVec3);
+    fn on_interact(&self, pos: IVec3);
 }
 
 pub struct Air;
@@ -20,6 +24,8 @@ impl Block for Air {
     fn get_model(&self, _: &BlockState) -> BlockModel {
         air_model()
     }
+    fn on_interact(&self, pos: IVec3) {}
+    fn on_place(&self, pos: IVec3) {}
 }
 
 pub struct Stone;
@@ -34,6 +40,8 @@ impl Block for Stone {
     fn get_model(&self, _: &BlockState) -> BlockModel {
         stone_model()
     }
+    fn on_interact(&self, pos: IVec3) {}
+    fn on_place(&self, pos: IVec3) {}
 }
 
 pub struct Dirt;
@@ -48,6 +56,8 @@ impl Block for Dirt {
     fn get_model(&self, _: &BlockState) -> BlockModel {
         dirt_model()
     }
+    fn on_interact(&self, pos: IVec3) {}
+    fn on_place(&self, pos: IVec3) {}
 }
 
 pub struct Grass;
@@ -62,4 +72,38 @@ impl Block for Grass {
     fn get_model(&self, _: &BlockState) -> BlockModel {
         grass_model()
     }
+    fn on_interact(&self, pos: IVec3) {}
+    fn on_place(&self, pos: IVec3) {}
+}
+
+pub struct Leaves;
+
+impl Block for Leaves {
+    fn name(&self) -> &str {
+        "Leaves"
+    }
+    fn is_solid(&self) -> bool {
+        true
+    }
+    fn get_model(&self, _: &BlockState) -> BlockModel {
+        leaves_model()
+    }
+    fn on_interact(&self, pos: IVec3) {}
+    fn on_place(&self, pos: IVec3) {}
+}
+
+pub struct Log;
+
+impl Block for Log {
+    fn name(&self) -> &str {
+        "Log"
+    }
+    fn is_solid(&self) -> bool {
+        true
+    }
+    fn get_model(&self, _: &BlockState) -> BlockModel {
+        log_model()
+    }
+    fn on_interact(&self, pos: IVec3) {}
+    fn on_place(&self, pos: IVec3) {}
 }

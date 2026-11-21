@@ -60,7 +60,12 @@ impl GameState {
             request_sender,
             result_receiver,
             latest_request_id: 0,
-            world_generator_settings: WorldGeneratorSettings { seed: 0 },
+            world_generator_settings: WorldGeneratorSettings {
+                seed: 0,
+                magnitude: 64.0,
+                weirdness: 32.0,
+                ridges: 64.0,
+            },
             camera_fly_speed: 32.0,
         };
 

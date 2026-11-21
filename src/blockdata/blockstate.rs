@@ -6,6 +6,8 @@ pub enum BlockState {
     Stone,
     Dirt,
     Grass,
+    Leaves,
+    Log,
 }
 
 impl BlockState {
@@ -15,6 +17,8 @@ impl BlockState {
             BlockState::Stone => &Stone,
             BlockState::Dirt => &Dirt,
             BlockState::Grass => &Grass,
+            BlockState::Leaves => &Leaves,
+            BlockState::Log => &Log,
         }
     }
 }

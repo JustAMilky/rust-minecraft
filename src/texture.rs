@@ -8,6 +8,9 @@ pub enum TextureId {
     GrassTop,
     GrassSide,
     OakPlanks,
+    Leaves,
+    LogTop,
+    LogSide,
 }
 
 pub struct Texture {
