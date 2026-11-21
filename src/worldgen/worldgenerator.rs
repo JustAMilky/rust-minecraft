@@ -95,25 +95,34 @@ impl WorldGenerator {
         y - 1
     }
 
-    pub fn add_chunk_structure_starts(&mut self, chunk: &mut Chunk, pos: &IVec3) {
-        println!("{}", self.random.read_f64());
-        /* let world_x = x + pos.x * CHUNK_SIZE;
-        let world_z = z + pos.z * CHUNK_SIZE;
+    pub fn add_chunk_structure_data(&mut self, chunk: &mut Chunk, pos: &IVec3) {
+        let num_trees = (self.random.read_f64() * 4.0) as i32;
 
-        if self.is_tree_pos(IVec2::new(world_x, world_z)) {
+        for _ in 0..num_trees {
+            let x = (self.random.read_f64() * CHUNK_SIZE as f64) as i32;
+            let z = (self.random.read_f64() * CHUNK_SIZE as f64) as i32;
+
+            let world_x = x + pos.x * CHUNK_SIZE;
+            let world_z = z + pos.z * CHUNK_SIZE;
+
             let y = self.get_surface_height(world_x, world_z);
+
+            if y < pos.y * CHUNK_SIZE || y >= (pos.y + 1) * CHUNK_SIZE {
+                continue;
+            }
 
             let tree_pos = IVec3::new(world_x, y + 1, world_z);
 
             chunk.structure_starts.push(StructureStart::new(
                 *pos,
-                tree(3, tree_pos).expect("Could not create tree"),
+                tree((self.random.read_f64() * 3.0 as f64) as i32 + 1, tree_pos)
+                    .expect("Could not create tree"),
             ));
-        } */
+        }
     }
 
     pub fn generate_chunk(&mut self, chunk: &mut Chunk, pos: &IVec3) {
-        self.add_chunk_structure_starts(chunk, pos);
+        self.add_chunk_structure_data(chunk, pos);
 
         for rel_x in 0..CHUNK_SIZE {
             for rel_y in 0..CHUNK_SIZE {
