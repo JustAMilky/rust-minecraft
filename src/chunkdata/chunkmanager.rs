@@ -14,8 +14,8 @@ use crate::texture::TextureAtlas;
 use crate::utils::{direction::Direction, posinrange::pos_in_range};
 use crate::worldgen::worldgenerator::*;
 
-const MAX_GEN_IN_FLIGHT: usize = 4;
-const MAX_MESH_IN_FLIGHT: usize = 4;
+const MAX_GEN_IN_FLIGHT: usize = 16;
+const MAX_MESH_IN_FLIGHT: usize = 16;
 
 pub struct ChunkManagerRequest {
     pub lat_render_dist: u32,
@@ -68,7 +68,7 @@ pub fn setup_chunk_manager_thread(
         let mut submitted: HashSet<IVec3> = HashSet::new();
         let mut mesh_submitted: HashSet<IVec3> = HashSet::new();
 
-        let chunk_job_manager = ChunkJobManager::new(4, 4, world_generator_settings, &atlas);
+        let chunk_job_manager = ChunkJobManager::new(8, 8, world_generator_settings, &atlas);
 
         loop {
             match request_receiver.try_iter().last() {

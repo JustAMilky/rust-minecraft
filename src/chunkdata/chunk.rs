@@ -9,7 +9,7 @@ use crate::{
 };
 use glam::IVec3;
 
-pub const CHUNK_SIZE: i32 = 16;
+pub const CHUNK_SIZE: i32 = 32;
 
 #[derive(Clone)]
 pub struct Chunk {
